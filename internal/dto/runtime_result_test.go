@@ -1,6 +1,23 @@
 package dto
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
+
+func TestRuntimeResultNaturalOutput(t *testing.T) {
+	t.Parallel()
+
+	success := NewSuccessRuntimeResult()
+	if got := success.ToOutputFormat(Natural); got != "Success!" {
+		t.Fatalf("unexpected success output: %q", got)
+	}
+
+	errResult := NewErrorRuntimeResult("boom")
+	if got := errResult.ToOutputFormat(Natural); got != "[Error] > An error occurred: boom" {
+		t.Fatalf("unexpected error output: %q", got)
+	}
+}
 
 func TestStatusRuntimeResultNaturalOutput(t *testing.T) {
 	t.Parallel()
@@ -57,4 +74,39 @@ func TestStatusRuntimeResultJSONOutput(t *testing.T) {
 	assertString(t, payload, "strategy", "lazy")
 	assertBool(t, payload, "default", false)
 	assertBool(t, payload, "active", false)
+}
+
+func TestStatusRuntimeResultNaturalOutputHandlesMissingConfigurationFields(t *testing.T) {
+	t.Parallel()
+
+	result := NewStatusRuntimeResult("lazy", true, 25, 54, 52, 52, true, map[string]any{})
+	got := result.ToOutputFormat(Natural)
+
+	if got == "" {
+		t.Fatal("expected non-empty natural output")
+	}
+
+	if expected := "DefaultStrategy: ''"; !containsLine(got, expected) {
+		t.Fatalf("expected output to contain %q, got %q", expected, got)
+	}
+
+	if expected := "DischargingStrategy: ''"; !containsLine(got, expected) {
+		t.Fatalf("expected output to contain %q, got %q", expected, got)
+	}
+}
+
+func TestPythonFloatFormatting(t *testing.T) {
+	t.Parallel()
+
+	if got := pythonFloat(54); got != "54.0" {
+		t.Fatalf("unexpected integer float format: %q", got)
+	}
+
+	if got := pythonFloat(52.5); got != "52.5" {
+		t.Fatalf("unexpected decimal float format: %q", got)
+	}
+}
+
+func containsLine(output string, expected string) bool {
+	return strings.Contains(output, expected)
 }

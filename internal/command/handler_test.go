@@ -52,8 +52,6 @@ func (m *mockHardwareController) IsOnAC() (bool, error) {
 }
 
 func TestHandleCommandUseAndPrintCurrent(t *testing.T) {
-	t.Parallel()
-
 	handler := newTestHandler(t)
 
 	result, err := handler.HandleCommand(UseCommand, map[string]string{"strategy": "medium"}, dto.Natural)
@@ -76,8 +74,6 @@ func TestHandleCommandUseAndPrintCurrent(t *testing.T) {
 }
 
 func TestHandleCommandPrintAll(t *testing.T) {
-	t.Parallel()
-
 	handler := newTestHandler(t)
 
 	result, err := handler.HandleCommand(PrintCommand, map[string]string{"print_selection": "all"}, dto.Natural)
@@ -95,8 +91,6 @@ func TestHandleCommandPrintAll(t *testing.T) {
 }
 
 func TestHandleCommandSetConfig(t *testing.T) {
-	t.Parallel()
-
 	handler := newTestHandler(t)
 
 	providedConfig := `{"defaultStrategy":"medium","strategyOnDischarging":"","strategies":{"medium":{"fanSpeedUpdateFrequency":5,"movingAverageInterval":20,"speedCurve":[{"temp":0,"speed":10},{"temp":85,"speed":100}]}}}`

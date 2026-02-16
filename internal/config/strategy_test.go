@@ -54,3 +54,21 @@ func TestStrategyPreservesSpeedCurve(t *testing.T) {
 		}
 	}
 }
+
+func TestStrategyIsDefault(t *testing.T) {
+	t.Parallel()
+
+	strategy := NewStrategy("lazy", StrategyParams{
+		FanSpeedUpdateFrequency: 5,
+		MovingAverageInterval:   20,
+		SpeedCurve:              []SpeedCurvePoint{{Temp: 0, Speed: 15}},
+	})
+
+	if !strategy.IsDefault("lazy") {
+		t.Fatal("expected strategy to match default name")
+	}
+
+	if strategy.IsDefault("medium") {
+		t.Fatal("expected strategy not to match different default name")
+	}
+}

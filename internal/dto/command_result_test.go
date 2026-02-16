@@ -33,6 +33,87 @@ func TestStrategyChangeCommandResultOutput(t *testing.T) {
 	assertBool(t, payload, "default", false)
 }
 
+func TestStrategyResetCommandResultOutput(t *testing.T) {
+	t.Parallel()
+
+	result := NewStrategyResetCommandResult("lazy", true)
+	if got := result.ToOutputFormat(Natural); got != "Strategy reset to default! Strategy in use: 'lazy'\nDefault: True" {
+		t.Fatalf("unexpected natural output: %q", got)
+	}
+
+	payload := decodeJSON(t, result.ToOutputFormat(JSON))
+	assertString(t, payload, "status", "success")
+	assertString(t, payload, "strategy", "lazy")
+	assertBool(t, payload, "default", true)
+}
+
+func TestConfigurationReloadCommandResultOutput(t *testing.T) {
+	t.Parallel()
+
+	result := NewConfigurationReloadCommandResult("agile", false)
+	if got := result.ToOutputFormat(Natural); got != "Reloaded with success! Strategy in use: 'agile'\nDefault: False" {
+		t.Fatalf("unexpected natural output: %q", got)
+	}
+
+	payload := decodeJSON(t, result.ToOutputFormat(JSON))
+	assertString(t, payload, "status", "success")
+	assertString(t, payload, "strategy", "agile")
+	assertBool(t, payload, "default", false)
+}
+
+func TestServicePauseCommandResultOutput(t *testing.T) {
+	t.Parallel()
+
+	result := NewServicePauseCommandResult()
+	if got := result.ToOutputFormat(Natural); got != "Service paused! The hardware fan control will take over" {
+		t.Fatalf("unexpected natural output: %q", got)
+	}
+
+	payload := decodeJSON(t, result.ToOutputFormat(JSON))
+	assertString(t, payload, "status", "success")
+}
+
+func TestServiceResumeCommandResultOutput(t *testing.T) {
+	t.Parallel()
+
+	result := NewServiceResumeCommandResult("medium", false)
+	if got := result.ToOutputFormat(Natural); got != "Service resumed!\nStrategy in use: 'medium'\nDefault: False" {
+		t.Fatalf("unexpected natural output: %q", got)
+	}
+
+	payload := decodeJSON(t, result.ToOutputFormat(JSON))
+	assertString(t, payload, "status", "success")
+	assertString(t, payload, "strategy", "medium")
+	assertBool(t, payload, "default", false)
+}
+
+func TestPrintActiveCommandResultOutput(t *testing.T) {
+	t.Parallel()
+
+	result := NewPrintActiveCommandResult(true)
+	if got := result.ToOutputFormat(Natural); got != "Active: True" {
+		t.Fatalf("unexpected natural output: %q", got)
+	}
+
+	payload := decodeJSON(t, result.ToOutputFormat(JSON))
+	assertString(t, payload, "status", "success")
+	assertBool(t, payload, "active", true)
+}
+
+func TestPrintCurrentStrategyCommandResultOutput(t *testing.T) {
+	t.Parallel()
+
+	result := NewPrintCurrentStrategyCommandResult("lazy", true)
+	if got := result.ToOutputFormat(Natural); got != "Strategy in use: 'lazy'\nDefault: True" {
+		t.Fatalf("unexpected natural output: %q", got)
+	}
+
+	payload := decodeJSON(t, result.ToOutputFormat(JSON))
+	assertString(t, payload, "status", "success")
+	assertString(t, payload, "strategy", "lazy")
+	assertBool(t, payload, "default", true)
+}
+
 func TestPrintStrategyListCommandResultOutput(t *testing.T) {
 	t.Parallel()
 
@@ -52,6 +133,19 @@ func TestPrintStrategyListCommandResultOutput(t *testing.T) {
 	if len(strategies) != 2 || strategies[0] != "lazy" || strategies[1] != "medium" {
 		t.Fatalf("unexpected strategies payload: %v", strategies)
 	}
+}
+
+func TestPrintFanSpeedCommandResultOutput(t *testing.T) {
+	t.Parallel()
+
+	result := NewPrintFanSpeedCommandResult("35")
+	if got := result.ToOutputFormat(Natural); got != "Current fan speed: '35%'" {
+		t.Fatalf("unexpected natural output: %q", got)
+	}
+
+	payload := decodeJSON(t, result.ToOutputFormat(JSON))
+	assertString(t, payload, "status", "success")
+	assertString(t, payload, "speed", "35")
 }
 
 func TestSetConfigurationCommandResultOutput(t *testing.T) {
@@ -74,6 +168,18 @@ func TestSetConfigurationCommandResultOutput(t *testing.T) {
 
 	if _, ok := payload["configuration"].(map[string]any); !ok {
 		t.Fatalf("configuration has unexpected type: %T", payload["configuration"])
+	}
+}
+
+func TestToJSONFallbackOnMarshalError(t *testing.T) {
+	t.Parallel()
+
+	raw := toJSON(map[string]any{"bad": make(chan int)})
+	payload := decodeJSON(t, raw)
+
+	assertString(t, payload, "status", "error")
+	if _, ok := payload["reason"].(string); !ok {
+		t.Fatalf("reason has unexpected type: %T", payload["reason"])
 	}
 }
 
