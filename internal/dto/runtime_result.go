@@ -1,6 +1,10 @@
 package dto
 
-import "fmt"
+import (
+	"fmt"
+	"strconv"
+	"strings"
+)
 
 type RuntimeResult struct {
 	Status string `json:"status"`
@@ -84,13 +88,13 @@ func (r StatusRuntimeResult) ToOutputFormat(format OutputFormat) string {
 	}
 
 	return fmt.Sprintf(
-		"Strategy: '%s'\nDefault: %s\nSpeed: %d%%\nTemp: %v°C\nMovingAverageTemp: %v°C\nEffectiveTemp: %v°C\nActive: %s\nDefaultStrategy: '%s'\nDischargingStrategy: '%s'\n",
+		"Strategy: '%s'\nDefault: %s\nSpeed: %d%%\nTemp: %s°C\nMovingAverageTemp: %s°C\nEffectiveTemp: %s°C\nActive: %s\nDefaultStrategy: '%s'\nDischargingStrategy: '%s'\n",
 		r.Strategy,
 		pythonBool(r.Default),
 		r.Speed,
-		r.Temperature,
-		r.MovingAverageTemperature,
-		r.EffectiveTemperature,
+		pythonFloat(r.Temperature),
+		pythonFloat(r.MovingAverageTemperature),
+		pythonFloat(r.EffectiveTemperature),
 		pythonBool(r.Active),
 		defaultStrategy,
 		dischargingStrategy,
@@ -99,4 +103,13 @@ func (r StatusRuntimeResult) ToOutputFormat(format OutputFormat) string {
 
 func (r StatusRuntimeResult) ToJSON() string {
 	return toJSON(r)
+}
+
+func pythonFloat(value float64) string {
+	raw := strconv.FormatFloat(value, 'f', -1, 64)
+	if strings.ContainsAny(raw, ".eE") {
+		return raw
+	}
+
+	return raw + ".0"
 }

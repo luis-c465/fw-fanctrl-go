@@ -14,6 +14,10 @@ type Formattable interface {
 	ToJSON() string
 }
 
+// Printable mirrors the legacy Python naming and remains available for
+// compatibility with packages/tests that still refer to the old type name.
+type Printable = Formattable
+
 func ParseOutputFormat(raw string) OutputFormat {
 	if strings.EqualFold(raw, string(JSON)) {
 		return JSON

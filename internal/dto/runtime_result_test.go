@@ -26,7 +26,7 @@ func TestStatusRuntimeResultNaturalOutput(t *testing.T) {
 	want := "Strategy: 'lazy'\n" +
 		"Default: True\n" +
 		"Speed: 25%\n" +
-		"Temp: 54°C\n" +
+		"Temp: 54.0°C\n" +
 		"MovingAverageTemp: 52.5°C\n" +
 		"EffectiveTemp: 52.5°C\n" +
 		"Active: True\n" +

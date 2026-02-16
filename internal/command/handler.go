@@ -107,6 +107,9 @@ func (h *CommandHandler) HandleCommand(command string, args map[string]string, o
 	case SetConfigCommand:
 		providedConfig := args["provided_config"]
 		if providedConfig == "" {
+			providedConfig = args["configuration"]
+		}
+		if providedConfig == "" {
 			return "", fmt.Errorf("missing provided configuration payload")
 		}
 
