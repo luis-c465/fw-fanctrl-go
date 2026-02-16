@@ -259,3 +259,14 @@ fabric.properties
 
 .idea/
 .temp/
+
+# Go
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+coverage.out

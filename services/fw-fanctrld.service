@@ -1,0 +1,9 @@
+[Unit]
+Description=Framework Fan Controller Daemon
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/fw-fanctrld
+
+[Install]
+WantedBy=multi-user.target
