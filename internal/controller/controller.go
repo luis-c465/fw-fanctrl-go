@@ -18,11 +18,15 @@ const (
 	tempHistoryLimit = 100
 )
 
-type CommandArgs struct {
-	Command        string
-	Strategy       string
-	PrintSelection string
-	ProvidedConfig []byte
+type StatusSnapshot struct {
+	Strategy                 string
+	Default                  bool
+	Speed                    int
+	Temperature              float64
+	MovingAverageTemperature float64
+	EffectiveTemperature     float64
+	Active                   bool
+	Configuration            map[string]any
 }
 
 type FanController struct {
@@ -326,8 +330,129 @@ func (f *FanController) Run(debug bool) error {
 	}
 }
 
-func (f *FanController) CommandManager(_ CommandArgs) (any, error) {
-	return nil, errors.New("command manager not implemented yet")
+func (f *FanController) IsDefaultStrategyInUse() bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	return f.overwrittenStrategy == nil
+}
+
+func (f *FanController) GetStrategies() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	strategies := f.config.GetStrategies()
+	return append([]string(nil), strategies...)
+}
+
+func (f *FanController) ReloadConfiguration() error {
+	f.mu.Lock()
+	err := f.config.Reload()
+	overwritten := ""
+	if err == nil && f.overwrittenStrategy != nil {
+		overwritten = f.overwrittenStrategy.Name
+	}
+	f.mu.Unlock()
+
+	if err != nil {
+		return err
+	}
+
+	if overwritten != "" {
+		return f.OverwriteStrategy(overwritten)
+	}
+
+	return nil
+}
+
+func (f *FanController) SetConfiguration(raw []byte) error {
+	f.mu.Lock()
+	parsed, err := f.config.Parse(raw)
+	if err != nil {
+		f.mu.Unlock()
+		return err
+	}
+
+	f.config.Data = parsed
+
+	overwritten := ""
+	if f.overwrittenStrategy != nil {
+		overwritten = f.overwrittenStrategy.Name
+	}
+
+	err = f.config.Save()
+	f.mu.Unlock()
+	if err != nil {
+		return err
+	}
+
+	if overwritten != "" {
+		return f.OverwriteStrategy(overwritten)
+	}
+
+	return nil
+}
+
+func (f *FanController) ConfigurationForOutput() map[string]any {
+	f.mu.Lock()
+	path := f.config.Path
+	data := f.config.Data
+	f.mu.Unlock()
+
+	return map[string]any{
+		"path": path,
+		"data": map[string]any{
+			"$schema":               data.Schema,
+			"defaultStrategy":       data.DefaultStrategy,
+			"strategyOnDischarging": data.StrategyOnDischarging,
+			"strategies":            data.Strategies,
+		},
+	}
+}
+
+func (f *FanController) StatusSnapshot() (StatusSnapshot, error) {
+	currentStrategy, err := f.GetCurrentStrategy()
+	if err != nil {
+		return StatusSnapshot{}, err
+	}
+
+	currentTemp, err := f.GetActualTemperature()
+	if err != nil {
+		return StatusSnapshot{}, err
+	}
+
+	movingAverageTemp, err := f.GetMovingAverageTemperature(currentStrategy.MovingAverageInterval)
+	if err != nil {
+		return StatusSnapshot{}, err
+	}
+
+	effectiveTemp, err := f.GetEffectiveTemperature(currentTemp, currentStrategy.MovingAverageInterval)
+	if err != nil {
+		return StatusSnapshot{}, err
+	}
+
+	f.mu.Lock()
+	snapshot := StatusSnapshot{
+		Strategy:                 currentStrategy.Name,
+		Default:                  f.overwrittenStrategy == nil,
+		Speed:                    f.speed,
+		Temperature:              currentTemp,
+		MovingAverageTemperature: movingAverageTemp,
+		EffectiveTemperature:     effectiveTemp,
+		Active:                   f.active,
+		Configuration: map[string]any{
+			"path": f.config.Path,
+			"data": map[string]any{
+				"$schema":               f.config.Data.Schema,
+				"defaultStrategy":       f.config.Data.DefaultStrategy,
+				"strategyOnDischarging": f.config.Data.StrategyOnDischarging,
+				"strategies":            f.config.Data.Strategies,
+			},
+		},
+	}
+	f.mu.Unlock()
+
+	return snapshot, nil
 }
 
 func (f *FanController) pushTemperature(temp float64) {
