@@ -1,2 +1,0 @@
-class SocketCallException(Exception):
-    pass

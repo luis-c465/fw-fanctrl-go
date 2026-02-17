@@ -1,2 +1,0 @@
-class ConfigurationParsingException(Exception):
-    pass

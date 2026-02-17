@@ -45,6 +45,6 @@ hardware.fw-fanctrl = {
 };
 ```
 
-This strategies gets appended to the [default config](https://github.com/TamtamHero/fw-fanctrl/blob/main/src/fw_fanctrl/_resources/config.json).
+This strategies gets appended to the [default config](https://github.com/TamtamHero/fw-fanctrl/blob/main/resources/config.json).
 
 If you find any issue feel free to open an [Bug report | packaging/nix](https://github.com/TamtamHero/fw-fanctrl/issues)!
