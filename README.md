@@ -1,172 +1,109 @@
 # fw-fanctrl
 
-[![Static Badge](https://img.shields.io/badge/Linux%E2%80%AF%2F%E2%80%AFGlobal-FCC624?style=flat&logo=linux&logoColor=FFFFFF&label=Platform&link=https%3A%2F%2Fgithub.com%2FTamtamHero%2Ffw-fanctrl%2Ftree%2Fmain)](https://github.com/TamtamHero/fw-fanctrl/tree/main)
-![Static Badge](https://img.shields.io/badge/no%20binary%20blobs-30363D?style=flat&logo=GitHub-Sponsors&logoColor=4dff61)
+`fw-fanctrl` controls Framework Laptop fan speed using configurable temperature/speed strategies.
 
-[![Static Badge](https://img.shields.io/badge/Python%203.12-FFDE57?style=flat&label=Requirement&link=https%3A%2F%2Fwww.python.org%2Fdownloads)](https://www.python.org/downloads)
+This rewrite is implemented in Go and ships as two binaries:
 
-## Platforms
+- `fw-fanctrld`: daemon (service)
+- `fw-fanctrl`: CLI client
 
-[![Static Badge](https://img.shields.io/badge/Linux%E2%80%AF%2F%E2%80%AFGlobal-FCC624?style=flat&logo=linux&logoColor=FFFFFF&label=Platform&link=https%3A%2F%2Fgithub.com%2FTamtamHero%2Ffw-fanctrl%2Ftree%2Fmain)](https://github.com/TamtamHero/fw-fanctrl/tree/main)
-[![Static Badge](https://img.shields.io/badge/NixOS-5277C3?style=flat&logo=nixos&logoColor=FFFFFF&label=Platform&link=https%3A%2F%2Fgithub.com%2FTamtamHero%2Ffw-fanctrl%2Ftree%2Fpackaging%2Fnix)](https://github.com/TamtamHero/fw-fanctrl/tree/packaging/nix/doc/nix-flake.md)
+There is no Python runtime dependency anymore.
 
-**Third-party**<br>
+## Requirements
 
-[![Static Badge](https://img.shields.io/badge/Arch%20Linux-1793D1?style=flat&logo=archlinux&logoColor=FFFFFF&label=Platform&link=https%3A%2F%2Faur.archlinux.org%2Fpackages%2Ffw-fanctrl-git)](https://aur.archlinux.org/packages/fw-fanctrl-git)
-[![Static Badge](https://img.shields.io/badge/Fedora-51A2DA?style=flat&logo=fedora&logoColor=FFFFFF&label=Platform&link=https%3A%2F%2Fgithub.com%2Ftulilirockz%2Ffw-fanctrl-rpm)](https://github.com/tulilirockz/fw-fanctrl-rpm)
-
-_You are a package manager? Add your platform here!_
-
-## Description
-
-Fw-fanctrl is a simple Python CLI service that controls Framework Laptop's fan(s)
-speed according to a configurable speed/temperature curve.
-
-Its default strategy aims for very quiet fan operation, but you can choose amongst the other provided strategies, or
-easily configure your own for a different comfort/performance trade-off.
-
-It also is possible to assign separate strategies depending on whether the laptop is charging or discharging.
-
-Under the hood, it uses [ectool](https://gitlab.howett.net/DHowett/ectool)
-to change parameters in Framework's embedded controller (EC).
-
-It is compatible with all 13" and 16" models, both AMD/Intel CPUs, with or without a discrete GPU.
-
-If the service is paused or stopped, the fans will revert to their default behaviour.
-
-## Table of Content
-
-<!-- TOC -->
-* [fw-fanctrl](#fw-fanctrl)
-  * [Platforms](#platforms)
-  * [Description](#description)
-  * [Table of Content](#table-of-content)
-  * [Third-party projects](#third-party-projects)
-  * [Documentation](#documentation)
-  * [Installation](#installation)
-    * [Platforms](#platforms-1)
-    * [Requirements](#requirements)
-    * [Dependencies](#dependencies)
-    * [Instructions](#instructions)
-  * [Update](#update)
-  * [Uninstall](#uninstall)
-  * [Development Setup](#development-setup)
-<!-- TOC -->
-
-## Third-party projects
-
-_Have some cool project to show? Add yours to the list!_
-
-| Name                                                                                                              | Description                                                                                                         | Picture                                                                                                                                                                                                                   |
-|-------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| [fw&#8209;fanctrl&#8209;gui](https://github.com/leopoldhub/fw-fanctrl-gui)                                        | Simple customtkinter python gui with system tray for fw&#8209;fanctrl                                               | [<img src="https://github.com/leopoldhub/fw-fanctrl-gui/blob/master/doc/screenshots/tray.png?raw=true" width="200">](https://github.com/leopoldhub/fw-fanctrl-gui)                                                        |
-| [fw-fanctrl-revived-gnome-shell-extension](https://github.com/ghostdevv/fw-fanctrl-revived-gnome-shell-extension) | A Gnome extension that provides a convenient way to control your framework laptop fan profile when using fw-fanctrl | [<img src="https://raw.githubusercontent.com/ghostdevv/fw-fanctrl-revived-gnome-shell-extension/refs/heads/main/.github/example.png" width="200">](https://github.com/ghostdevv/fw-fanctrl-revived-gnome-shell-extension) |
-| [fw_fanctrl_applet](https://github.com/not-a-feature/fw_fanctrl_applet)                                           | Cinnamon applet to control the framework fan-speed strategy using fw-fanctrl                                        | [<img src="https://raw.githubusercontent.com/not-a-feature/fw_fanctrl_applet/main/screenshot.png" width="200">](https://github.com/not-a-feature/fw_fanctrl_applet)                                                       |
-| [ulauncher-fw-fanctrl](https://github.com/ghostdevv/ulauncher-fw-fanctrl)                                         | A fw-fanctrl extension for the app launcher [ulauncher](https://ulauncher.io)                                       | [<img src="https://raw.githubusercontent.com/ghostdevv/ulauncher-fw-fanctrl/32f7c0484b8903daa85f1b963ed4e901d7379a8a/.github/demo.png" width="200">](https://github.com/ghostdevv/ulauncher-fw-fanctrl)                   |
-
-## Documentation
-
-More documentation could be found [here](./doc/README.md).
+- Linux kernel >= 6.11
+- `ectool` installed and available in `PATH`
+- Go >= 1.21 (only required when building from source)
 
 ## Installation
 
-### Platforms
+### From release tarball
 
-| Name&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | Package&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | Branch&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | Documentation                                                                                                     |
-|------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------|
-| Linux&nbsp;/&nbsp;Global                                                                                         | [installation&nbsp;script](https://github.com/TamtamHero/fw-fanctrl/blob/main/install.sh)                           | [main](https://github.com/TamtamHero/fw-fanctrl/tree/main)                                                         | [instructions](https://github.com/TamtamHero/fw-fanctrl/tree/main?tab=readme-ov-file#instructions)                |
-| NixOS (<= 25.04)                                                                                                 | [flake](https://github.com/TamtamHero/fw-fanctrl/blob/packaging/nix/flake.nix)                                      | [packaging/nix](https://github.com/TamtamHero/fw-fanctrl/tree/packaging/nix)                                       | [packaging/nix/doc/nix&#8209;flake](https://github.com/TamtamHero/fw-fanctrl/tree/packaging/nix/doc/nix-flake.md) |
-| NixOS (Unstable)                                                                                                 | [derivation](https://search.nixos.org/packages?channel=unstable&show=fw-fanctrl&from=0&size=50&sort=relevance&type=packages&query=fw-fanctrl)||[packaging/nix/doc/nix&#8209;flake](https://github.com/TamtamHero/fw-fanctrl/tree/main/doc/nixos.md)|
-
-**Third-party**
-
-| Name&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | Package&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | Documentation                                                        |
-|------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------|
-| Arch&nbsp;Linux                                                                                                  | [AUR](https://aur.archlinux.org/packages/fw-fanctrl-git)                                                            |                                                                      |
-| Fedora&nbsp;/&nbsp;RPM                                                                                           | [COPR](https://copr.fedorainfracloud.org/coprs/tulilirockz/fw-fanctrl/package/fw-fanctrl/)                          | [GIT&nbsp;repository](https://github.com/tulilirockz/fw-fanctrl-rpm) |
-
-### Requirements
-
-| Name&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | Version&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | Url                                                                  |
-|------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------|
-| Linux kernel                                                                                                     | \>= 6.11.x                                                                                                                |                                                                      |
-| Python                                                                                                           | \>= 3.12.x                                                                                                                | [https://www.python.org/downloads](https://www.python.org/downloads) |
-
-### Dependencies
-
-Dependencies are downloaded and installed automatically, but can be excluded from the installation script if you wish to
-do this manually.
-
-| Name&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | Version&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | Url &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | Sub&#8209;dependencies | Exclusion&nbsp;argument |
-|------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------|------------------------|-------------------------|
-| DHowett@ectool                                                                                                   | build#899                                                                                                                 | [https://gitlab.howett.net/DHowett/ectool](https://gitlab.howett.net/DHowett/ectool)                             | libftdi                | `--no-ectool`           |
-
-### Instructions
-
-[Download the repo](https://github.com/TamtamHero/fw-fanctrl/archive/refs/heads/main.zip) and extract it manually, or
-download/clone it with the appropriate tools:
-
-```shell
-git clone "https://github.com/TamtamHero/fw-fanctrl.git"
-```
-
-```shell
-curl -L "https://github.com/TamtamHero/fw-fanctrl/archive/refs/heads/main.zip" -o "./fw-fanctrl.zip" && unzip "./fw-fanctrl.zip" -d "./fw-fanctrl" && rm -rf "./fw-fanctrl.zip"
-```
-
-Then run the installation script with administrator privileges
-
-> ⚠ **Linux Mint** users should add the `--effective-installation-dir "/usr/local/bin"` option.
->
-> ⚠ **Fedora Atomic desktops** users should add the `--prefix-dir "/var/usrlocal/"` option.
+1. Download and extract the release archive.
+2. From the extracted directory, install:
 
 ```bash
-sudo ./install.sh
+sudo make install
+sudo make enable
 ```
 
-You can add a number of arguments to the installation command to suit your needs
+If `ectool` is not installed yet, install it first:
 
-| argument                                                                                          | description                                                                                     |
-|---------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------|
-| `--dest-dir <installation destination directory (defaults to /)>`                                 | specify an installation destination directory                                                   |
-| `--prefix-dir <installation prefix directory (defaults to /usr)>`                                 | specify an installation prefix directory                                                        |
-| `--sysconf-dir <system configuration destination directory (defaults to /etc)>`                   | specify a default configuration directory                                                       |
-| `--no-ectool`                                                                                     | disable ectool installation and service activation                                              |
-| `--no-post-install`                                                                               | disable post-install process                                                                    |
-| `--no-pre-uninstall`                                                                              | disable pre-uninstall process                                                                   |
-| `--no-battery-sensors`                                                                            | disable checking battery temperature sensors                                                    |
-| `--no-pip-install`                                                                                | disable the pip installation (should be done manually instead)                                  |
-| `--pipx`                                                                                          | install using pipx instead of pip (useful if os does not allow global pip install like debian ) |
-| `--python-prefix-dir <python installation prefix directory (defaults to [dest-dir][prefix-dir])>` | specify the python prefix directory for package installation                                    |
-| `--effective-installation-dir <directory (defaults to [python-prefix-dir]/bin)>`                  | overrides the installation in which our `fw-fanctrl` executable is                              |
+```bash
+sudo make install-ectool
+```
+
+### From source
+
+```bash
+git clone "https://github.com/TamtamHero/fw-fanctrl.git"
+cd fw-fanctrl
+make build
+sudo make install
+sudo make enable
+```
 
 ## Update
 
-To update, you can download or pull the appropriate branch from this repository, and run the installation script again.
+Download the new release (or pull latest source) and run:
+
+```bash
+sudo make install
+```
 
 ## Uninstall
 
-To uninstall, run the installation script with the `--remove` argument, as well as other
-corresponding [arguments if necessary](#instructions)
+```bash
+sudo make disable
+sudo make uninstall
+```
+
+## Quick Usage
 
 ```bash
-sudo ./install.sh --remove
+fw-fanctrl print all
+fw-fanctrl print list
+fw-fanctrl use lazy
+fw-fanctrl reset
+fw-fanctrl --output-format JSON print current
 ```
 
-## Development Setup
+## Migration Notes (Python -> Go)
 
-> It is recommended to use a virtual environment to install development dependencies
+- Existing config format is compatible (`/etc/fw-fanctrl/config.json` + `config.schema.json`).
+- Socket protocol and path are unchanged, so third-party clients keep working.
+- Service unit changed from `fw-fanctrl.service` to `fw-fanctrld.service`.
+- Legacy Python CLI flags and `run` command are removed from the client.
 
-Install the development dependencies with the following command:
+Suggested upgrade path from old installs:
 
-```shell
-pip install -e ".[dev]"
+```bash
+sudo systemctl stop fw-fanctrl || true
+sudo systemctl disable fw-fanctrl || true
+sudo make install
+sudo make enable
 ```
 
-The project uses the [black](https://github.com/psf/black) formatter.
+## Documentation
 
-Please format your contributions before commiting them.
+- Commands: `doc/commands.md`
+- Configuration: `doc/configuration.md`
+- NixOS notes: `doc/nixos.md`
 
-```shell
-python -m black .
+## Third-party projects
+
+_Have a cool integration? Open a PR and add it here._
+
+| Name | Description | Picture |
+|---|---|---|
+| [fw-fanctrl-gui](https://github.com/leopoldhub/fw-fanctrl-gui) | Simple customtkinter Python GUI with system tray for fw-fanctrl | [<img src="https://github.com/leopoldhub/fw-fanctrl-gui/blob/master/doc/screenshots/tray.png?raw=true" width="200">](https://github.com/leopoldhub/fw-fanctrl-gui) |
+| [fw-fanctrl-revived-gnome-shell-extension](https://github.com/ghostdevv/fw-fanctrl-revived-gnome-shell-extension) | GNOME extension for changing fw-fanctrl strategy quickly | [<img src="https://raw.githubusercontent.com/ghostdevv/fw-fanctrl-revived-gnome-shell-extension/refs/heads/main/.github/example.png" width="200">](https://github.com/ghostdevv/fw-fanctrl-revived-gnome-shell-extension) |
+| [fw_fanctrl_applet](https://github.com/not-a-feature/fw_fanctrl_applet) | Cinnamon applet to control strategy | [<img src="https://raw.githubusercontent.com/not-a-feature/fw_fanctrl_applet/main/screenshot.png" width="200">](https://github.com/not-a-feature/fw_fanctrl_applet) |
+| [ulauncher-fw-fanctrl](https://github.com/ghostdevv/ulauncher-fw-fanctrl) | Ulauncher extension for fw-fanctrl commands | [<img src="https://raw.githubusercontent.com/ghostdevv/ulauncher-fw-fanctrl/32f7c0484b8903daa85f1b963ed4e901d7379a8a/.github/demo.png" width="200">](https://github.com/ghostdevv/ulauncher-fw-fanctrl) |
+
+## Development
+
+```bash
+go test ./...
+golangci-lint run ./...
 ```

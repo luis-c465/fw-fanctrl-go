@@ -1,70 +1,88 @@
 # Commands
 
-Here is a list of commands and options used to interact with the service.
+This project has two binaries:
 
-the base of all commands is the following
+- `fw-fanctrl`: client command you run manually
+- `fw-fanctrld`: daemon (usually started by systemd)
 
-```shell
-fw-fanctrl [commands and options]
+## Client (`fw-fanctrl`)
+
+Base form:
+
+```bash
+fw-fanctrl [global options] <command> [arguments]
 ```
 
-First, the global options
+Global options:
 
-| Option                    | Optional | Choices       | Default | Description                                                                    |
-|---------------------------|----------|---------------|---------|--------------------------------------------------------------------------------|
-| --socket-controller, --sc | yes      | unix          | unix    | the socket controller to use for communication between the cli and the service |
-| --output-format           | yes      | NATURAL, JSON | NATURAL | the client socket controller output format                                     |
+| Option | Optional | Choices | Default | Description |
+|---|---|---|---|---|
+| `--socket-controller`, `--sc` | yes | `unix` | `unix` | Socket controller used to communicate with daemon |
+| `--output-format` | yes | `NATURAL`, `JSON` | `NATURAL` | Output format for command responses |
 
-**run**
+### `use <strategy>`
 
-run the service manually
+Change the current strategy.
 
-If you have installed it correctly, the systemd `fw-fanctrl.service` service will do this for you, so you probably will
-never need those.
+### `reset`
 
-| Option                      | Optional | Choices        | Default              | Description                                                                       |
-|-----------------------------|----------|----------------|----------------------|-----------------------------------------------------------------------------------|
-| \<strategy>                 | yes      |                | the default strategy | the name of the strategy to use                                                   |
-| --config                    | yes      | \[CONFIG_PATH] |                      | the configuration file path                                                       |
-| --silent, -s                | yes      |                |                      | disable printing speed/temp status to stdout                                      |
-| --hardware-controller, --hc | yes      | ectool         | ectool               | the hardware controller to use for fetching and setting the temp and fan(s) speed |
-| --no-battery-sensors        | yes      |                |                      | disable checking battery temperature sensors (for mainboards without batteries)   |
+Reset to default strategy behavior.
 
-**use**
+### `reload`
 
-change the current strategy
+Reload configuration from disk.
 
-| Option      | Optional | Description                     |
-|-------------|----------|---------------------------------|
-| \<strategy> | no       | the name of the strategy to use |
+### `pause`
 
-**reset**
+Pause the service and return fan control to firmware.
 
-reset to the default strategy
+### `resume`
 
-**reload**
+Resume service fan control.
 
-reload the configuration file
+### `print [all|active|current|list|speed]`
 
-**pause**
+Print service information (defaults to `all`).
 
-pause the service
+| Choice | Description |
+|---|---|
+| `all` | Full runtime status |
+| `active` | Whether controller is active |
+| `current` | Strategy currently in use |
+| `list` | Available strategy names |
+| `speed` | Current fan speed percentage |
 
-**resume**
+### `set_config <json>`
 
-resume the service
+Replace configuration with a JSON payload.
 
-**print**
+Example:
 
-print the selected information
+```bash
+fw-fanctrl set_config '{"$schema":"./config.schema.json","defaultStrategy":"lazy","strategyOnDischarging":"","strategies":{"lazy":{"fanSpeedUpdateFrequency":5,"movingAverageInterval":30,"speedCurve":[{"temp":0,"speed":15},{"temp":50,"speed":15},{"temp":65,"speed":25},{"temp":70,"speed":35},{"temp":75,"speed":50},{"temp":85,"speed":100}]}}}'
+```
 
-| Option             | Optional | Choices                   | Default | Description            |
-|--------------------|----------|---------------------------|---------|------------------------|
-| \<print_selection> | yes      | all, current, list, speed | all     | what should be printed |
+## Daemon (`fw-fanctrld`)
 
-| Choice  | Description                      |
-|---------|----------------------------------|
-| all     | All details                      |
-| current | The current strategy being used  |
-| list    | List available strategies        |
-| speed   | The current fan speed percentage |
+Base form:
+
+```bash
+fw-fanctrld [options] [strategy]
+```
+
+Options:
+
+| Option | Optional | Choices | Default | Description |
+|---|---|---|---|---|
+| `--config`, `-c` | yes | file path | `/etc/fw-fanctrl/config.json` | Configuration file path |
+| `--silent`, `-s` | yes | boolean flag | `false` | Disable periodic runtime output |
+| `--hardware-controller`, `--hc` | yes | `ectool` | `ectool` | Hardware backend |
+| `--socket-controller`, `--sc` | yes | `unix` | `unix` | Socket backend |
+| `--no-battery-sensors` | yes | boolean flag | `false` | Ignore battery temp sensors |
+| `--output-format` | yes | `NATURAL`, `JSON` | `JSON` | Runtime output format |
+| `[strategy]` | yes | strategy name | config default | Initial strategy override |
+
+Notes:
+
+- `fw-fanctrl` no longer has a `run` subcommand.
+- The daemon service name is `fw-fanctrld.service`.

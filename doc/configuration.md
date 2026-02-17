@@ -1,17 +1,3 @@
-# Table of Content
-
-<!-- TOC -->
-* [Table of Content](#table-of-content)
-* [Configuration](#configuration)
-  * [Default Strategy](#default-strategy)
-  * [Discharging Strategy](#discharging-strategy)
-  * [Strategies](#strategies)
-    * [Requirements](#requirements)
-    * [Speed Curve](#speed-curve)
-    * [Fan Speed Update Frequency](#fan-speed-update-frequency)
-    * [Moving Average Interval](#moving-average-interval)
-<!-- TOC -->
-
 # Configuration
 
 The service uses these configuration files by default:
@@ -19,10 +5,10 @@ The service uses these configuration files by default:
 - Main configuration: `/etc/fw-fanctrl/config.json`
 - JSON Schema: `/etc/fw-fanctrl/config.schema.json`
 
-For custom installations using dest-dir or sysconf-dir parameters:
+For custom installations using `make` variables (`DESTDIR`, `SYSCONFDIR`):
 
-- `[dest-dir(/)][sysconf-dir(/etc)]/fw-fanctrl/config.json`
-- `[dest-dir(/)][sysconf-dir(/etc)]/fw-fanctrl/config.schema.json`
+- `[DESTDIR][SYSCONFDIR]/fw-fanctrl/config.json`
+- `[DESTDIR][SYSCONFDIR]/fw-fanctrl/config.schema.json`
 
 The configuration contains a list of strategies, ranked from the quietest to loudest,
 as well as the default and discharging strategies.
@@ -67,9 +53,9 @@ This field is optional and can be left empty for it to have the same behavior as
 
 ## Strategies
 
-Define strategies under strategies object using this format:
+Define strategies under the `strategies` object using this format:
 
-```
+```json
 "strategies": {
   "strategy-name": {
     "speedCurve": [ ... ],
@@ -91,12 +77,12 @@ And, at least have the `speedCurve` property defined.
 
 It represents by the curve points for `f(temperature) = fan(s) speed`.
 
-The `temp` field value is a number with precision of up to 0.01°C (e.g., 15.23),
+The `temp` field value is a number with precision of up to 0.01 C (e.g., 15.23),
 while the `speed` is a positive integer between 0 and 100 %.
 
 It should contain at least a single temperature point.
 
-```
+```json
 "speedCurve": [
   { "temp": 40,   "speed": 20 },
   { "temp": 60.5, "speed": 50 },
@@ -116,7 +102,7 @@ It is the interval between fan speed adjustments.
 
 It is an optional positive integer comprised between 1 and 10 and defaults to 5.
 
-```
+```json
 "fanSpeedUpdateFrequency": 5
 ```
 
@@ -132,7 +118,7 @@ It is the time window in seconds over which the moving average of temperature is
 
 It is an optional positive integer comprised between 1 and 100 and defaults to 20.
 
-```
+```json
 "movingAverageInterval": 20
 ```
 
