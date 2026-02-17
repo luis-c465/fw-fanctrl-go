@@ -12,7 +12,7 @@ import (
 
 const errorResponsePrefix = "[Error] > "
 
-func SendCommand(socketPath string, command string) (string, error) {
+func SendCommand(socketPath string, command string) (result string, retErr error) {
 	conn, err := net.Dial("unix", socketPath)
 	if err != nil {
 		if isDaemonUnavailable(err) {
@@ -21,7 +21,11 @@ func SendCommand(socketPath string, command string) (string, error) {
 
 		return "", fmt.Errorf("failed to connect to daemon socket %q: %w", socketPath, err)
 	}
-	defer conn.Close()
+	defer func() {
+		if err := conn.Close(); err != nil && retErr == nil {
+			retErr = fmt.Errorf("failed to close connection: %w", err)
+		}
+	}()
 
 	if _, err := conn.Write([]byte(command)); err != nil {
 		return "", fmt.Errorf("failed to send command to daemon: %w", err)

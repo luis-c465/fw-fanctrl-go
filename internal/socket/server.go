@@ -15,7 +15,8 @@ const maxCommandSize = 4096
 
 var commandBufferPool = sync.Pool{
 	New: func() any {
-		return make([]byte, maxCommandSize)
+		b := make([]byte, maxCommandSize)
+		return &b
 	},
 }
 
@@ -90,10 +91,11 @@ func (s *Server) Stop() error {
 }
 
 func (s *Server) handleConnection(conn net.Conn) {
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
-	buffer := commandBufferPool.Get().([]byte)
-	defer commandBufferPool.Put(buffer)
+	bufPtr := commandBufferPool.Get().(*[]byte)
+	defer commandBufferPool.Put(bufPtr)
+	buffer := *bufPtr
 
 	n, err := conn.Read(buffer)
 	if err != nil && !errors.Is(err, io.EOF) {

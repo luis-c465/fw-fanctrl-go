@@ -61,8 +61,8 @@ func run() error {
 			return err
 		}
 
-		fmt.Fprintln(os.Stdout, response)
-		return nil
+		_, err = fmt.Fprintln(os.Stdout, response)
+		return err
 	}
 
 	rootCmd.AddCommand(&cobra.Command{
