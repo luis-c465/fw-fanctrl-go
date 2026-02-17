@@ -131,6 +131,7 @@ func TestGetMovingAverageTemperatureUsesLastNNonZeroValues(t *testing.T) {
 
 	fc.mu.Lock()
 	fc.tempHistory = []float64{0, 10, 20, 0, 30, 40}
+	fc.tempHistoryHead = 0
 	fc.mu.Unlock()
 
 	got, err := fc.GetMovingAverageTemperature(3)
@@ -150,6 +151,7 @@ func TestGetEffectiveTemperatureReturnsMinimum(t *testing.T) {
 
 	fc.mu.Lock()
 	fc.tempHistory = []float64{50, 60}
+	fc.tempHistoryHead = 0
 	fc.mu.Unlock()
 
 	got, err := fc.GetEffectiveTemperature(60, 2)
@@ -432,6 +434,7 @@ func TestStatusSnapshotIncludesComputedTemperatures(t *testing.T) {
 	fc.mu.Lock()
 	fc.speed = 25
 	fc.tempHistory = []float64{40, 50, 60}
+	fc.tempHistoryHead = 0
 	fc.mu.Unlock()
 
 	snapshot, err := fc.StatusSnapshot()
@@ -491,6 +494,7 @@ func TestPushTemperatureMaintainsHistoryLimit(t *testing.T) {
 
 	fc.mu.Lock()
 	fc.tempHistory = nil
+	fc.tempHistoryHead = 0
 	fc.mu.Unlock()
 
 	for i := 0; i < tempHistoryLimit+10; i++ {
@@ -504,12 +508,14 @@ func TestPushTemperatureMaintainsHistoryLimit(t *testing.T) {
 		t.Fatalf("expected temp history length %d, got %d", tempHistoryLimit, len(fc.tempHistory))
 	}
 
-	if !almostEqual(fc.tempHistory[0], 10) {
-		t.Fatalf("expected oldest value 10, got %.2f", fc.tempHistory[0])
+	oldestIdx := fc.tempHistoryHead
+	if !almostEqual(fc.tempHistory[oldestIdx], 10) {
+		t.Fatalf("expected oldest value 10, got %.2f", fc.tempHistory[oldestIdx])
 	}
 
-	if !almostEqual(fc.tempHistory[len(fc.tempHistory)-1], 109) {
-		t.Fatalf("expected latest value 109, got %.2f", fc.tempHistory[len(fc.tempHistory)-1])
+	latestIdx := (fc.tempHistoryHead - 1 + len(fc.tempHistory)) % len(fc.tempHistory)
+	if !almostEqual(fc.tempHistory[latestIdx], 109) {
+		t.Fatalf("expected latest value 109, got %.2f", fc.tempHistory[latestIdx])
 	}
 }
 
@@ -552,7 +558,10 @@ func TestSleepOrShutdownTimeoutPath(t *testing.T) {
 	hw := &mockHardwareController{temperature: 42, onAC: true}
 	fc := newTestFanController(t, hw)
 
-	shutdown, err := fc.sleepOrShutdown(1*time.Millisecond, make(chan os.Signal, 1))
+	timer := time.NewTimer(time.Hour)
+	defer stopAndDrainTimer(timer)
+
+	shutdown, err := fc.sleepOrShutdown(1*time.Millisecond, make(chan os.Signal, 1), timer)
 	if err != nil {
 		t.Fatalf("sleepOrShutdown() returned error: %v", err)
 	}
@@ -569,7 +578,10 @@ func TestSleepOrShutdownSignalPath(t *testing.T) {
 	signalCh := make(chan os.Signal, 1)
 	signalCh <- os.Interrupt
 
-	shutdown, err := fc.sleepOrShutdown(100*time.Millisecond, signalCh)
+	timer := time.NewTimer(time.Hour)
+	defer stopAndDrainTimer(timer)
+
+	shutdown, err := fc.sleepOrShutdown(100*time.Millisecond, signalCh, timer)
 	if err != nil {
 		t.Fatalf("sleepOrShutdown() returned error: %v", err)
 	}

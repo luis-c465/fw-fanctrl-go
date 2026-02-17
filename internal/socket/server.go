@@ -13,6 +13,12 @@ import (
 
 const maxCommandSize = 4096
 
+var commandBufferPool = sync.Pool{
+	New: func() any {
+		return make([]byte, maxCommandSize)
+	},
+}
+
 type Server struct {
 	socketPath     string
 	listener       net.Listener
@@ -86,7 +92,9 @@ func (s *Server) Stop() error {
 func (s *Server) handleConnection(conn net.Conn) {
 	defer conn.Close()
 
-	buffer := make([]byte, maxCommandSize)
+	buffer := commandBufferPool.Get().([]byte)
+	defer commandBufferPool.Put(buffer)
+
 	n, err := conn.Read(buffer)
 	if err != nil && !errors.Is(err, io.EOF) {
 		s.writeResponse(conn, fmt.Sprintf("[Error] > Failed to read command: %v", err))

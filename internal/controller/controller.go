@@ -35,6 +35,7 @@ type FanController struct {
 	overwrittenStrategy *config.Strategy
 	speed               int
 	tempHistory         []float64
+	tempHistoryHead     int
 	active              bool
 	timecount           int
 	mu                  sync.Mutex
@@ -42,12 +43,13 @@ type FanController struct {
 
 func NewFanController(hw hardware.HardwareController, cfg *config.Configuration, strategyName string) *FanController {
 	controller := &FanController{
-		hardware:    hw,
-		config:      cfg,
-		speed:       0,
-		tempHistory: make([]float64, tempHistoryLimit),
-		active:      true,
-		timecount:   0,
+		hardware:        hw,
+		config:          cfg,
+		speed:           0,
+		tempHistory:     make([]float64, tempHistoryLimit),
+		tempHistoryHead: 0,
+		active:          true,
+		timecount:       0,
 	}
 
 	if strategyName != "" {
@@ -68,17 +70,47 @@ func (f *FanController) GetActualTemperature() (float64, error) {
 
 func (f *FanController) GetMovingAverageTemperature(timeInterval int) (float64, error) {
 	f.mu.Lock()
-	history := append([]float64(nil), f.tempHistory...)
-	f.mu.Unlock()
-
-	nonZeroTemps := make([]float64, 0, len(history))
-	for _, temp := range history {
-		if temp > 0 {
-			nonZeroTemps = append(nonZeroTemps, temp)
-		}
+	historyLen := len(f.tempHistory)
+	head := f.tempHistoryHead
+	targetNonZero := historyLen
+	if timeInterval > 0 {
+		targetNonZero = timeInterval
 	}
 
-	if len(nonZeroTemps) == 0 {
+	total := 0.0
+	nonZeroCount := 0
+
+	if historyLen == tempHistoryLimit {
+		for i := 0; i < historyLen; i++ {
+			idx := head - 1 - i
+			if idx < 0 {
+				idx += historyLen
+			}
+
+			temp := f.tempHistory[idx]
+			if temp > 0 {
+				total += temp
+				nonZeroCount++
+				if nonZeroCount == targetNonZero {
+					break
+				}
+			}
+		}
+	} else {
+		for i := historyLen - 1; i >= 0; i-- {
+			temp := f.tempHistory[i]
+			if temp > 0 {
+				total += temp
+				nonZeroCount++
+				if nonZeroCount == targetNonZero {
+					break
+				}
+			}
+		}
+	}
+	f.mu.Unlock()
+
+	if nonZeroCount == 0 {
 		temp, err := f.GetActualTemperature()
 		if err != nil {
 			return 0, err
@@ -86,20 +118,7 @@ func (f *FanController) GetMovingAverageTemperature(timeInterval int) (float64, 
 		return round2(temp), nil
 	}
 
-	if timeInterval <= 0 {
-		timeInterval = len(nonZeroTemps)
-	}
-
-	if timeInterval > 0 && len(nonZeroTemps) > timeInterval {
-		nonZeroTemps = nonZeroTemps[len(nonZeroTemps)-timeInterval:]
-	}
-
-	total := 0.0
-	for _, temp := range nonZeroTemps {
-		total += temp
-	}
-
-	return round2(total / float64(len(nonZeroTemps))), nil
+	return round2(total / float64(nonZeroCount)), nil
 }
 
 func (f *FanController) GetEffectiveTemperature(currentTemp float64, timeInterval int) (float64, error) {
@@ -249,6 +268,9 @@ func (f *FanController) Run(debug bool) error {
 	signal.Notify(signalCh, syscall.SIGINT, syscall.SIGTERM)
 	defer signal.Stop(signalCh)
 
+	sleepTimer := time.NewTimer(time.Second)
+	defer stopAndDrainTimer(sleepTimer)
+
 	for {
 		shutdown, err := f.checkShutdown(signalCh)
 		if err != nil {
@@ -259,7 +281,7 @@ func (f *FanController) Run(debug bool) error {
 		}
 
 		if !f.IsActive() {
-			shutdown, err := f.sleepOrShutdown(5*time.Second, signalCh)
+			shutdown, err := f.sleepOrShutdown(5*time.Second, signalCh, sleepTimer)
 			if err != nil {
 				return err
 			}
@@ -320,7 +342,7 @@ func (f *FanController) Run(debug bool) error {
 		f.timecount++
 		f.mu.Unlock()
 
-		shutdown, err = f.sleepOrShutdown(1*time.Second, signalCh)
+		shutdown, err = f.sleepOrShutdown(1*time.Second, signalCh, sleepTimer)
 		if err != nil {
 			return err
 		}
@@ -459,13 +481,18 @@ func (f *FanController) pushTemperature(temp float64) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
+	if len(f.tempHistory) == 0 {
+		f.tempHistory = make([]float64, tempHistoryLimit)
+		f.tempHistoryHead = 0
+	}
+
 	if len(f.tempHistory) < tempHistoryLimit {
 		f.tempHistory = append(f.tempHistory, temp)
 		return
 	}
 
-	copy(f.tempHistory, f.tempHistory[1:])
-	f.tempHistory[len(f.tempHistory)-1] = temp
+	f.tempHistory[f.tempHistoryHead] = temp
+	f.tempHistoryHead = (f.tempHistoryHead + 1) % len(f.tempHistory)
 }
 
 func (f *FanController) checkShutdown(signalCh <-chan os.Signal) (bool, error) {
@@ -480,15 +507,37 @@ func (f *FanController) checkShutdown(signalCh <-chan os.Signal) (bool, error) {
 	}
 }
 
-func (f *FanController) sleepOrShutdown(d time.Duration, signalCh <-chan os.Signal) (bool, error) {
+func (f *FanController) sleepOrShutdown(d time.Duration, signalCh <-chan os.Signal, timer *time.Timer) (bool, error) {
+	resetTimer(timer, d)
+
 	select {
 	case <-signalCh:
 		if err := f.Pause(); err != nil {
 			return true, fmt.Errorf("failed to restore auto fan control on shutdown: %w", err)
 		}
 		return true, nil
-	case <-time.After(d):
+	case <-timer.C:
 		return false, nil
+	}
+}
+
+func resetTimer(timer *time.Timer, d time.Duration) {
+	if !timer.Stop() {
+		select {
+		case <-timer.C:
+		default:
+		}
+	}
+
+	timer.Reset(d)
+}
+
+func stopAndDrainTimer(timer *time.Timer) {
+	if !timer.Stop() {
+		select {
+		case <-timer.C:
+		default:
+		}
 	}
 }
 

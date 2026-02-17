@@ -262,3 +262,55 @@ func TestRunEctoolCommandReturnsStderrOnFailure(t *testing.T) {
 		t.Fatalf("expected stderr content in error, got %q", err.Error())
 	}
 }
+
+func TestIsOnACUsesCachedResultWithinTTL(t *testing.T) {
+	scriptDir := t.TempDir()
+	countFile := filepath.Join(scriptDir, "battery_count")
+	scriptPath := filepath.Join(scriptDir, "ectool")
+
+	script := "#!/bin/sh\n" +
+		"cmd=\"$1\"\n" +
+		"if [ \"$cmd\" = \"battery\" ]; then\n" +
+		"  n=0\n" +
+		"  if [ -f \"" + countFile + "\" ]; then\n" +
+		"    n=$(cat \"" + countFile + "\")\n" +
+		"  fi\n" +
+		"  n=$((n+1))\n" +
+		"  printf \"%s\" \"$n\" > \"" + countFile + "\"\n" +
+		"  printf \"Flags: BATT_PRESENT AC_PRESENT CHARGING\\n\"\n" +
+		"fi\n"
+
+	if err := os.WriteFile(scriptPath, []byte(script), 0o755); err != nil {
+		t.Fatalf("failed to create fake ectool: %v", err)
+	}
+
+	t.Setenv("PATH", scriptDir)
+
+	controller, err := NewEctoolHardwareController(false)
+	if err != nil {
+		t.Fatalf("NewEctoolHardwareController() returned error: %v", err)
+	}
+
+	first, err := controller.IsOnAC()
+	if err != nil {
+		t.Fatalf("first IsOnAC() returned error: %v", err)
+	}
+
+	second, err := controller.IsOnAC()
+	if err != nil {
+		t.Fatalf("second IsOnAC() returned error: %v", err)
+	}
+
+	if !first || !second {
+		t.Fatal("expected cached AC result to remain true")
+	}
+
+	rawCount, err := os.ReadFile(countFile)
+	if err != nil {
+		t.Fatalf("failed to read battery command count: %v", err)
+	}
+
+	if strings.TrimSpace(string(rawCount)) != "1" {
+		t.Fatalf("expected battery command to run once, got %q", string(rawCount))
+	}
+}

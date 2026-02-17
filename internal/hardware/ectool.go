@@ -14,7 +14,10 @@ import (
 	"time"
 )
 
-const ectoolCommandTimeout = 5 * time.Second
+const (
+	ectoolCommandTimeout = 5 * time.Second
+	acStatusCacheTTL     = 10 * time.Second
+)
 
 var (
 	batterySensorRegexp = regexp.MustCompile(`\d+ Battery`)
@@ -26,6 +29,8 @@ var (
 type EctoolHardwareController struct {
 	noBatterySensorMode bool
 	nonBatterySensors   []string
+	lastACCheck         time.Time
+	lastACResult        bool
 }
 
 func NewEctoolHardwareController(noBatterySensorMode bool) (*EctoolHardwareController, error) {
@@ -87,12 +92,19 @@ func (c *EctoolHardwareController) Resume() error {
 }
 
 func (c *EctoolHardwareController) IsOnAC() (bool, error) {
+	if !c.lastACCheck.IsZero() && time.Since(c.lastACCheck) < acStatusCacheTTL {
+		return c.lastACResult, nil
+	}
+
 	output, err := runEctoolCommand(true, "battery")
 	if err != nil {
 		return false, err
 	}
 
-	return parseACPresent(output), nil
+	c.lastACResult = parseACPresent(output)
+	c.lastACCheck = time.Now()
+
+	return c.lastACResult, nil
 }
 
 func parseTemperatures(output string) []int {
