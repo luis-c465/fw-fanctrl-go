@@ -154,11 +154,6 @@ Step 1 (scaffold)
   │   ├── fw-fanctrld.service # systemd service file (template)
   │   └── system-sleep/
   │       └── fw-fanctrl-suspend  # suspend/resume hook (template)
-  ├── fetch/
-  │   └── ectool/
-  │       └── linux/
-  │           ├── gitlab_job_id
-  │           └── hash.sha256
   ├── Makefile
   ├── go.mod
   ├── go.sum
@@ -171,14 +166,13 @@ Step 1 (scaffold)
 **Sub-tasks:**
 1. Create a new directory (or `git init` a new repo) named `fw-fanctrl`.
 2. Run `go mod init github.com/luis-c465/fw-fanctrl` (or appropriate module path) to create `go.mod`. Set Go version to `1.21` minimum.
-3. Create all directories listed above: `cmd/fw-fanctrl/`, `cmd/fw-fanctrld/`, `internal/config/`, `internal/controller/`, `internal/hardware/`, `internal/socket/`, `internal/command/`, `internal/dto/`, `resources/`, `services/`, `services/system-sleep/`, `fetch/ectool/linux/`.
+3. Create all directories listed above: `cmd/fw-fanctrl/`, `cmd/fw-fanctrld/`, `internal/config/`, `internal/controller/`, `internal/hardware/`, `internal/socket/`, `internal/command/`, `internal/dto/`, `resources/`, `services/`, `services/system-sleep/`.
 4. Create placeholder `main.go` files in both `cmd/` directories with `package main` and an empty `func main()`.
 5. Copy `config.json` and `config.schema.json` from the original project's `src/fw_fanctrl/_resources/` into `resources/`. These files are identical — no modifications needed.
-6. Copy `fetch/ectool/linux/gitlab_job_id` and `fetch/ectool/linux/hash.sha256` from the original project.
-7. Copy the `LICENSE` file from the original project.
-8. Copy `.editorconfig` from the original project.
-9. Create a `.gitignore` appropriate for Go projects (ignore `bin/`, `dist/`, `.idea/`, `.vscode/`, `*.exe`, etc.).
-10. Add initial Go dependencies: `go get github.com/spf13/cobra` and `go get github.com/kaptinlin/jsonschema`.
+6. Copy the `LICENSE` file from the original project.
+7. Copy `.editorconfig` from the original project.
+8. Create a `.gitignore` appropriate for Go projects (ignore `bin/`, `dist/`, `.idea/`, `.vscode/`, `*.exe`, etc.).
+9. Add initial Go dependencies: `go get github.com/spf13/cobra` and `go get github.com/kaptinlin/jsonschema`.
 
 **Edge Cases & Gotchas:**
 - Ensure the Go module path matches the intended GitHub repository URL.
@@ -778,12 +772,11 @@ Step 1 (scaffold)
        - Install schema to `$(DESTDIR)$(SYSCONFDIR)/fw-fanctrl/config.schema.json`
        - Generate and install systemd service file (sed template substitution for binary path and config path)
        - Install suspend hook script
-     - `install-ectool:` — download and install ectool (same logic as current `installEctool` bash function)
-     - `uninstall:` — remove installed files, stop/disable service
+      - `uninstall:` — remove installed files, stop/disable service
      - `enable:` — `systemctl daemon-reload && systemctl enable --now fw-fanctrld`
      - `disable:` — `systemctl stop fw-fanctrld && systemctl disable fw-fanctrld`
      - `clean:` — `rm -rf bin/`
-     - `.PHONY: all build test lint install uninstall enable disable clean install-ectool`
+      - `.PHONY: all build test lint install uninstall enable disable clean`
 
 2. **Create `services/fw-fanctrld.service`:**
    ```ini

@@ -27,11 +27,7 @@ sudo make install
 sudo make enable
 ```
 
-If `ectool` is not installed yet, install it first:
-
-```bash
-sudo make install-ectool
-```
+If `ectool` is not installed yet, install it separately using your distro's package manager.
 
 ### From source
 

@@ -53,17 +53,6 @@ install: build
 	sed -e "s|%BINDIR%|$(BINDIR)|g" "$(SUSPEND_TEMPLATE)" > "$(SUSPEND_FILE)"
 	chmod 755 "$(SUSPEND_FILE)"
 
-install-ectool:
-	tmpdir="$$(mktemp -d)"; trap 'rm -rf "$$tmpdir"' EXIT; \
-	job_id="$$(cat fetch/ectool/linux/gitlab_job_id)"; \
-	expected_sha256="$$(cat fetch/ectool/linux/hash.sha256)"; \
-	artifact_zip="$$tmpdir/artifact.zip"; \
-	curl -sS -L -o "$$artifact_zip" "https://gitlab.howett.net/DHowett/ectool/-/jobs/$${job_id}/artifacts/download?file_type=archive"; \
-	actual_sha256="$$(sha256sum "$$artifact_zip" | cut -d ' ' -f 1)"; \
-	if [ "$$actual_sha256" != "$$expected_sha256" ]; then echo "Incorrect sha256 sum for ectool artifact '$${job_id}': expected '$${expected_sha256}', got '$${actual_sha256}'"; exit 1; fi; \
-	unzip -q -j "$$artifact_zip" "_build/src/ectool" -d "$$tmpdir"; \
-	install -Dm755 "$$tmpdir/ectool" "$(DESTDIR)$(BINDIR)/ectool"
-
 uninstall:
 	if [ -z "$(DESTDIR)" ]; then $(MAKE) disable || true; fi
 	rm -f "$(DESTDIR)$(BINDIR)/fw-fanctrl"
@@ -83,4 +72,4 @@ disable:
 clean:
 	rm -rf "$(BIN_DIR)"
 
-.PHONY: all build test lint install install-ectool uninstall enable disable clean
+.PHONY: all build test lint install uninstall enable disable clean
