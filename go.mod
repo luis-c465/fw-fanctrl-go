@@ -1,4 +1,4 @@
-module github.com/TamtamHero/fw-fanctrl
+module github.com/luis-c465/fw-fanctrl
 
 go 1.25
 

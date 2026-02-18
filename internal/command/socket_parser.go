@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/TamtamHero/fw-fanctrl/internal/dto"
+	"github.com/luis-c465/fw-fanctrl/internal/dto"
 )
 
 type ParsedSocketCommand struct {

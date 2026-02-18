@@ -66,7 +66,7 @@ Rewrite the `fw-fanctrl` Framework Laptop fan controller from Python to Go, prod
 - The `config.schema.json` file's `$schema` pattern constraint (`^\./config\.schema\.json$`) may need adjustment since the schema will be embedded — the validator should still work with the embedded schema bytes.
 
 **Open Questions (non-blocking):**
-- Should the new repo be under the same GitHub org (`TamtamHero`) or a different one? (Doesn't affect the plan)
+- Should the new repo be under the same GitHub org (`luis-c465`) or a different one? (Doesn't affect the plan)
 - Should `goreleaser` be used for release automation in addition to the Makefile? (Can be added later)
 - Should the NixOS packaging branch be considered in this plan? (Out of scope — can be done after the rewrite)
 
@@ -170,7 +170,7 @@ Step 1 (scaffold)
 
 **Sub-tasks:**
 1. Create a new directory (or `git init` a new repo) named `fw-fanctrl`.
-2. Run `go mod init github.com/TamtamHero/fw-fanctrl` (or appropriate module path) to create `go.mod`. Set Go version to `1.21` minimum.
+2. Run `go mod init github.com/luis-c465/fw-fanctrl` (or appropriate module path) to create `go.mod`. Set Go version to `1.21` minimum.
 3. Create all directories listed above: `cmd/fw-fanctrl/`, `cmd/fw-fanctrld/`, `internal/config/`, `internal/controller/`, `internal/hardware/`, `internal/socket/`, `internal/command/`, `internal/dto/`, `resources/`, `services/`, `services/system-sleep/`, `fetch/ectool/linux/`.
 4. Create placeholder `main.go` files in both `cmd/` directories with `package main` and an empty `func main()`.
 5. Copy `config.json` and `config.schema.json` from the original project's `src/fw_fanctrl/_resources/` into `resources/`. These files are identical — no modifications needed.

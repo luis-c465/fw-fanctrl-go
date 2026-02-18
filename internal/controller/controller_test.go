@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TamtamHero/fw-fanctrl/internal/config"
-	"github.com/TamtamHero/fw-fanctrl/resources"
+	"github.com/luis-c465/fw-fanctrl/internal/config"
+	"github.com/luis-c465/fw-fanctrl/resources"
 )
 
 const floatEpsilon = 0.000001

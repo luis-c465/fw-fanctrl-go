@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/TamtamHero/fw-fanctrl/resources"
+	"github.com/luis-c465/fw-fanctrl/resources"
 )
 
 func TestParseEmbeddedDefaultConfig(t *testing.T) {

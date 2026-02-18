@@ -10,8 +10,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/TamtamHero/fw-fanctrl/internal/config"
-	"github.com/TamtamHero/fw-fanctrl/internal/hardware"
+	"github.com/luis-c465/fw-fanctrl/internal/config"
+	"github.com/luis-c465/fw-fanctrl/internal/hardware"
 )
 
 const (

@@ -19,7 +19,7 @@ and a high fan speed strategy on AC (+ noise, - heat).
 **The schema contains the structure and restrictions for a valid configuration.**
 
 You can add or edit strategies, and if you think you have one that deserves to be shared,
-feel free to share it in [#110](https://github.com/TamtamHero/fw-fanctrl/issues/110).
+feel free to share it in [#110](https://github.com/luis-c465/fw-fanctrl/issues/110).
 
 ## Default Strategy
 

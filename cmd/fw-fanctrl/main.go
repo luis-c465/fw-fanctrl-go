@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/TamtamHero/fw-fanctrl/internal/dto"
-	"github.com/TamtamHero/fw-fanctrl/internal/socket"
+	"github.com/luis-c465/fw-fanctrl/internal/dto"
+	"github.com/luis-c465/fw-fanctrl/internal/socket"
 	"github.com/spf13/cobra"
 )
 

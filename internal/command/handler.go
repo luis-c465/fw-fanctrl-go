@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/TamtamHero/fw-fanctrl/internal/controller"
-	"github.com/TamtamHero/fw-fanctrl/internal/dto"
+	"github.com/luis-c465/fw-fanctrl/internal/controller"
+	"github.com/luis-c465/fw-fanctrl/internal/dto"
 )
 
 const (

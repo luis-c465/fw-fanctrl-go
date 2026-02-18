@@ -7,10 +7,10 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/TamtamHero/fw-fanctrl/internal/config"
-	"github.com/TamtamHero/fw-fanctrl/internal/controller"
-	"github.com/TamtamHero/fw-fanctrl/internal/dto"
-	"github.com/TamtamHero/fw-fanctrl/resources"
+	"github.com/luis-c465/fw-fanctrl/internal/config"
+	"github.com/luis-c465/fw-fanctrl/internal/controller"
+	"github.com/luis-c465/fw-fanctrl/internal/dto"
+	"github.com/luis-c465/fw-fanctrl/resources"
 )
 
 type mockHardwareController struct {

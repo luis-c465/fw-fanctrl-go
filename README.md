@@ -36,7 +36,7 @@ sudo make install-ectool
 ### From source
 
 ```bash
-git clone "https://github.com/TamtamHero/fw-fanctrl.git"
+git clone "https://github.com/luis-c465/fw-fanctrl.git"
 cd fw-fanctrl
 make build
 sudo make install

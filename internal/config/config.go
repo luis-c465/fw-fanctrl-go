@@ -9,8 +9,8 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/TamtamHero/fw-fanctrl/resources"
 	"github.com/kaptinlin/jsonschema"
+	"github.com/luis-c465/fw-fanctrl/resources"
 )
 
 type RawConfig struct {
