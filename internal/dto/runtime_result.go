@@ -120,7 +120,7 @@ func (r StatusRuntimeResult) ToOutputFormat(format OutputFormat) string {
 	b.WriteString(base)
 	b.WriteString("Zones:\n")
 	for _, zone := range r.Zones {
-		b.WriteString(fmt.Sprintf(
+		fmt.Fprintf(&b,
 			"- %s: Sensors=%s Temp=%s°C MovingAverageTemp=%s°C EffectiveTemp=%s°C ComputedSpeed=%d%%\n",
 			zone.Name,
 			strings.Join(zone.Sensors, ","),
@@ -128,7 +128,7 @@ func (r StatusRuntimeResult) ToOutputFormat(format OutputFormat) string {
 			pythonFloat(zone.MovingAverageTemperature),
 			pythonFloat(zone.EffectiveTemperature),
 			zone.ComputedSpeed,
-		))
+		)
 	}
 
 	return b.String()
