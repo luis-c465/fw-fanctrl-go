@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/luis-c465/fw-fanctrl/internal/config"
+	"github.com/luis-c465/fw-fanctrl/internal/hardware"
 	"github.com/luis-c465/fw-fanctrl/resources"
 )
 
@@ -22,6 +23,7 @@ type mockHardwareController struct {
 	mu sync.Mutex
 
 	temperature float64
+	readings    []hardware.SensorReading
 	onAC        bool
 
 	setSpeeds   []int
@@ -44,6 +46,23 @@ func (m *mockHardwareController) GetTemperature() (float64, error) {
 	defer m.mu.Unlock()
 
 	return m.temperature, nil
+}
+
+func (m *mockHardwareController) GetTemperatures() ([]hardware.SensorReading, error) {
+	if m.temperatureErr != nil {
+		return nil, m.temperatureErr
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if len(m.readings) > 0 {
+		out := make([]hardware.SensorReading, len(m.readings))
+		copy(out, m.readings)
+		return out, nil
+	}
+
+	return []hardware.SensorReading{{Name: "cpu@4c", Index: 0, TempC: m.temperature, Present: true}}, nil
 }
 
 func (m *mockHardwareController) SetSpeed(speed int) error {
@@ -185,7 +204,7 @@ func TestAdaptSpeedLazyStrategyCurve(t *testing.T) {
 			hw := &mockHardwareController{temperature: tc.temp, onAC: true}
 			fc := newTestFanController(t, hw)
 
-			if err := fc.AdaptSpeed(tc.temp); err != nil {
+			if err := fc.AdaptSpeed(tc.temp, []hardware.SensorReading{{Name: "cpu@4c", Index: 0, TempC: tc.temp, Present: true}}); err != nil {
 				t.Fatalf("AdaptSpeed() returned error: %v", err)
 			}
 
@@ -222,6 +241,58 @@ func TestOverwriteAndClearStrategy(t *testing.T) {
 
 	if strategy.Name != "lazy" {
 		t.Fatalf("expected default strategy 'lazy' after clear, got %q", strategy.Name)
+	}
+}
+
+func TestAdaptSpeedMultiSensorTakesMaximumAcrossZones(t *testing.T) {
+	hw := &mockHardwareController{
+		temperature: 55,
+		onAC:        true,
+		readings: []hardware.SensorReading{
+			{Name: "cpu@4c", Index: 0, TempC: 53, Present: true},
+			{Name: "ambient_f75303@4d", Index: 1, TempC: 60, Present: true},
+		},
+	}
+	fc := newTestFanController(t, hw)
+
+	provided := []byte(`{
+		"$schema": "./config.schema.json",
+		"defaultStrategy": "multi",
+		"strategyOnDischarging": "",
+		"strategies": {
+			"multi": {
+				"fanSpeedUpdateFrequency": 1,
+				"movingAverageInterval": 5,
+				"sensorCurves": [
+					{
+						"name": "cpu",
+						"sensors": ["cpu@4c"],
+						"speedCurve": [{"temp": 0, "speed": 10}, {"temp": 60, "speed": 20}]
+					},
+					{
+						"name": "chassis",
+						"sensors": ["ambient_f75303@4d"],
+						"speedCurve": [{"temp": 0, "speed": 20}, {"temp": 60, "speed": 80}]
+					}
+				]
+			}
+		}
+	}`)
+
+	if err := fc.SetConfiguration(provided); err != nil {
+		t.Fatalf("SetConfiguration() returned error: %v", err)
+	}
+
+	if err := fc.OverwriteStrategy("multi"); err != nil {
+		t.Fatalf("OverwriteStrategy() returned error: %v", err)
+	}
+
+	if err := fc.AdaptSpeed(60, hw.readings); err != nil {
+		t.Fatalf("AdaptSpeed() returned error: %v", err)
+	}
+
+	if got := hw.lastSetSpeed(); got < 70 {
+		t.Fatalf("expected fan speed to follow hotter chassis zone, got %d", got)
 	}
 }
 
@@ -308,8 +379,8 @@ func TestGetStrategiesReturnsSortedCopy(t *testing.T) {
 	fc := newTestFanController(t, hw)
 
 	strategies := fc.GetStrategies()
-	if len(strategies) != 7 {
-		t.Fatalf("expected 7 strategies, got %d", len(strategies))
+	if len(strategies) != 8 {
+		t.Fatalf("expected 8 strategies, got %d", len(strategies))
 	}
 
 	if strategies[0] != "aeolus" || strategies[len(strategies)-1] != "very-agile" {
@@ -479,7 +550,7 @@ func TestAdaptSpeedDoesNotCallHardwareWhenInactive(t *testing.T) {
 		t.Fatalf("Pause() returned error: %v", err)
 	}
 
-	if err := fc.AdaptSpeed(70); err != nil {
+	if err := fc.AdaptSpeed(70, []hardware.SensorReading{{Name: "cpu@4c", Index: 0, TempC: 70, Present: true}}); err != nil {
 		t.Fatalf("AdaptSpeed() returned error: %v", err)
 	}
 

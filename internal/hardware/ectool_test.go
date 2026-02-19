@@ -29,6 +29,56 @@ func TestParseTemperatures(t *testing.T) {
 	}
 }
 
+func TestParseSensorReadingsNameBasedFormat(t *testing.T) {
+	t.Parallel()
+
+	output := `
+--sensor name -------- temperature -------- fan speed --
+ambient_f75303@4d     324 K (= 51 C)          -1%
+charger_f75303@4d     321 K (= 48 C)          -1%
+cpu@4c                326 K (= 53 C)           6%
+Sensor 7 disabled
+`
+
+	got := parseSensorReadings(output)
+	if len(got) != 3 {
+		t.Fatalf("expected 3 readings, got %d", len(got))
+	}
+
+	if got[0].Name != "ambient_f75303@4d" || got[0].TempC != 51 {
+		t.Fatalf("unexpected first reading: %+v", got[0])
+	}
+	if got[0].Index != 0 {
+		t.Fatalf("expected first reading index 0, got %d", got[0].Index)
+	}
+
+	if got[2].Name != "cpu@4c" || got[2].TempC != 53 {
+		t.Fatalf("unexpected cpu reading: %+v", got[2])
+	}
+	if got[2].Index != 2 {
+		t.Fatalf("expected cpu reading index 2, got %d", got[2].Index)
+	}
+}
+
+func TestParseSensorReadingsNumericFormat(t *testing.T) {
+	t.Parallel()
+
+	output := "0: 300 K (= 27 C)\n2: 335 K (= 62 C)\n"
+	got := parseSensorReadings(output)
+
+	if len(got) != 2 {
+		t.Fatalf("expected 2 readings, got %d", len(got))
+	}
+
+	if got[0].Name != "0" || got[0].Index != 0 || got[0].TempC != 27 {
+		t.Fatalf("unexpected first reading: %+v", got[0])
+	}
+
+	if got[1].Name != "2" || got[1].Index != 2 || got[1].TempC != 62 {
+		t.Fatalf("unexpected second reading: %+v", got[1])
+	}
+}
+
 func TestHighestTemperatureOrFallbackReturnsFallbackWhenEmpty(t *testing.T) {
 	t.Parallel()
 
@@ -206,6 +256,15 @@ func TestRunEctoolCommandAndControllerIntegration(t *testing.T) {
 
 	if temp != 62.0 {
 		t.Fatalf("expected temperature 62.0, got %.2f", temp)
+	}
+
+	readings, err := controller.GetTemperatures()
+	if err != nil {
+		t.Fatalf("GetTemperatures() returned error: %v", err)
+	}
+
+	if len(readings) != 2 {
+		t.Fatalf("expected 2 readings, got %d", len(readings))
 	}
 
 	if err := controller.SetSpeed(35); err != nil {

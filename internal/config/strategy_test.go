@@ -72,3 +72,49 @@ func TestStrategyIsDefault(t *testing.T) {
 		t.Fatal("expected strategy not to match different default name")
 	}
 }
+
+func TestStrategyIsMultiSensor(t *testing.T) {
+	t.Parallel()
+
+	strategy := NewStrategy("multi", StrategyParams{
+		FanSpeedUpdateFrequency: 5,
+		MovingAverageInterval:   30,
+		SensorCurves: []SensorCurve{
+			{
+				Name:    "cpu",
+				Sensors: []string{"cpu@4c"},
+				SpeedCurve: []SpeedCurvePoint{
+					{Temp: 0, Speed: 15},
+					{Temp: 85, Speed: 100},
+				},
+			},
+		},
+	})
+
+	if !strategy.IsMultiSensor() {
+		t.Fatal("expected strategy to be in multi-sensor mode")
+	}
+}
+
+func TestStrategyDefaultsSensorCurveMovingAverageInterval(t *testing.T) {
+	t.Parallel()
+
+	strategy := NewStrategy("multi", StrategyParams{
+		FanSpeedUpdateFrequency: 5,
+		MovingAverageInterval:   30,
+		SensorCurves: []SensorCurve{
+			{
+				Name:    "cpu",
+				Sensors: []string{"cpu@4c"},
+				SpeedCurve: []SpeedCurvePoint{
+					{Temp: 0, Speed: 15},
+					{Temp: 85, Speed: 100},
+				},
+			},
+		},
+	})
+
+	if strategy.SensorCurves[0].MovingAverageInterval != 30 {
+		t.Fatalf("expected sensor curve movingAverageInterval 30, got %d", strategy.SensorCurves[0].MovingAverageInterval)
+	}
+}

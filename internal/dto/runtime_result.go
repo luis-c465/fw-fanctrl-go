@@ -44,8 +44,18 @@ type StatusRuntimeResult struct {
 	Temperature              float64        `json:"temperature"`
 	MovingAverageTemperature float64        `json:"movingAverageTemperature"`
 	EffectiveTemperature     float64        `json:"effectiveTemperature"`
+	Zones                    []ZoneResult   `json:"zones,omitempty"`
 	Active                   bool           `json:"active"`
 	Configuration            map[string]any `json:"configuration"`
+}
+
+type ZoneResult struct {
+	Name                     string   `json:"name"`
+	Sensors                  []string `json:"sensors"`
+	Temperature              float64  `json:"temperature"`
+	MovingAverageTemperature float64  `json:"movingAverageTemperature"`
+	EffectiveTemperature     float64  `json:"effectiveTemperature"`
+	ComputedSpeed            int      `json:"computedSpeed"`
 }
 
 func NewStatusRuntimeResult(
@@ -55,6 +65,7 @@ func NewStatusRuntimeResult(
 	temperature float64,
 	movingAverageTemperature float64,
 	effectiveTemperature float64,
+	zones []ZoneResult,
 	active bool,
 	configuration map[string]any,
 ) StatusRuntimeResult {
@@ -66,6 +77,7 @@ func NewStatusRuntimeResult(
 		Temperature:              temperature,
 		MovingAverageTemperature: movingAverageTemperature,
 		EffectiveTemperature:     effectiveTemperature,
+		Zones:                    zones,
 		Active:                   active,
 		Configuration:            configuration,
 	}
@@ -87,7 +99,7 @@ func (r StatusRuntimeResult) ToOutputFormat(format OutputFormat) string {
 		}
 	}
 
-	return fmt.Sprintf(
+	base := fmt.Sprintf(
 		"Strategy: '%s'\nDefault: %s\nSpeed: %d%%\nTemp: %s°C\nMovingAverageTemp: %s°C\nEffectiveTemp: %s°C\nActive: %s\nDefaultStrategy: '%s'\nDischargingStrategy: '%s'\n",
 		r.Strategy,
 		pythonBool(r.Default),
@@ -99,6 +111,27 @@ func (r StatusRuntimeResult) ToOutputFormat(format OutputFormat) string {
 		defaultStrategy,
 		dischargingStrategy,
 	)
+
+	if len(r.Zones) == 0 {
+		return base
+	}
+
+	b := strings.Builder{}
+	b.WriteString(base)
+	b.WriteString("Zones:\n")
+	for _, zone := range r.Zones {
+		b.WriteString(fmt.Sprintf(
+			"- %s: Sensors=%s Temp=%s°C MovingAverageTemp=%s°C EffectiveTemp=%s°C ComputedSpeed=%d%%\n",
+			zone.Name,
+			strings.Join(zone.Sensors, ","),
+			pythonFloat(zone.Temperature),
+			pythonFloat(zone.MovingAverageTemperature),
+			pythonFloat(zone.EffectiveTemperature),
+			zone.ComputedSpeed,
+		))
+	}
+
+	return b.String()
 }
 
 func (r StatusRuntimeResult) ToJSON() string {

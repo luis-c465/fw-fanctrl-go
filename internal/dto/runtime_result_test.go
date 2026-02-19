@@ -29,6 +29,7 @@ func TestStatusRuntimeResultNaturalOutput(t *testing.T) {
 		54,
 		52.5,
 		52.5,
+		nil,
 		true,
 		map[string]any{
 			"path": "/etc/fw-fanctrl/config.json",
@@ -65,6 +66,7 @@ func TestStatusRuntimeResultJSONOutput(t *testing.T) {
 		60,
 		58,
 		58,
+		nil,
 		false,
 		map[string]any{"path": "/tmp/config.json", "data": map[string]any{"defaultStrategy": "lazy"}},
 	)
@@ -79,7 +81,7 @@ func TestStatusRuntimeResultJSONOutput(t *testing.T) {
 func TestStatusRuntimeResultNaturalOutputHandlesMissingConfigurationFields(t *testing.T) {
 	t.Parallel()
 
-	result := NewStatusRuntimeResult("lazy", true, 25, 54, 52, 52, true, map[string]any{})
+	result := NewStatusRuntimeResult("lazy", true, 25, 54, 52, 52, nil, true, map[string]any{})
 	got := result.ToOutputFormat(Natural)
 
 	if got == "" {
@@ -104,6 +106,39 @@ func TestPythonFloatFormatting(t *testing.T) {
 
 	if got := pythonFloat(52.5); got != "52.5" {
 		t.Fatalf("unexpected decimal float format: %q", got)
+	}
+}
+
+func TestStatusRuntimeResultNaturalOutputWithZones(t *testing.T) {
+	t.Parallel()
+
+	result := NewStatusRuntimeResult(
+		"multi",
+		true,
+		35,
+		53,
+		50,
+		50,
+		[]ZoneResult{
+			{
+				Name:                     "cpu",
+				Sensors:                  []string{"cpu@4c"},
+				Temperature:              53,
+				MovingAverageTemperature: 50,
+				EffectiveTemperature:     50,
+				ComputedSpeed:            35,
+			},
+		},
+		true,
+		map[string]any{},
+	)
+
+	got := result.ToOutputFormat(Natural)
+	if !strings.Contains(got, "Zones:") {
+		t.Fatalf("expected zones block in output, got %q", got)
+	}
+	if !strings.Contains(got, "cpu") {
+		t.Fatalf("expected cpu zone in output, got %q", got)
 	}
 }
 

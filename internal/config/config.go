@@ -89,6 +89,37 @@ func (c *Configuration) Parse(rawJSON []byte) (RawConfig, error) {
 		}
 	}
 
+	for strategyName, strategy := range cfg.Strategies {
+		if len(strategy.SpeedCurve) == 0 && len(strategy.SensorCurves) == 0 {
+			return RawConfig{}, ConfigurationParsingError{Message: fmt.Sprintf("strategy %q must define speedCurve or sensorCurves", strategyName)}
+		}
+
+		zoneNames := make(map[string]struct{}, len(strategy.SensorCurves))
+		for _, sensorCurve := range strategy.SensorCurves {
+			if sensorCurve.Name == "" {
+				return RawConfig{}, ConfigurationParsingError{Message: fmt.Sprintf("strategy %q contains sensorCurve with empty name", strategyName)}
+			}
+			if _, exists := zoneNames[sensorCurve.Name]; exists {
+				return RawConfig{}, ConfigurationParsingError{Message: fmt.Sprintf("strategy %q contains duplicated sensorCurve name %q", strategyName, sensorCurve.Name)}
+			}
+			zoneNames[sensorCurve.Name] = struct{}{}
+
+			if len(sensorCurve.Sensors) == 0 {
+				return RawConfig{}, ConfigurationParsingError{Message: fmt.Sprintf("strategy %q sensorCurve %q must define at least one sensor", strategyName, sensorCurve.Name)}
+			}
+
+			for _, sensorName := range sensorCurve.Sensors {
+				if sensorName == "" {
+					return RawConfig{}, ConfigurationParsingError{Message: fmt.Sprintf("strategy %q sensorCurve %q contains empty sensor name", strategyName, sensorCurve.Name)}
+				}
+			}
+
+			if len(sensorCurve.SpeedCurve) == 0 {
+				return RawConfig{}, ConfigurationParsingError{Message: fmt.Sprintf("strategy %q sensorCurve %q must define speedCurve", strategyName, sensorCurve.Name)}
+			}
+		}
+	}
+
 	return cfg, nil
 }
 

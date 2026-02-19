@@ -162,6 +162,7 @@ func (h *CommandHandler) handlePrintCommand(args map[string]string, outputFormat
 			snapshot.Temperature,
 			snapshot.MovingAverageTemperature,
 			snapshot.EffectiveTemperature,
+			zoneSnapshotToDTO(snapshot.Zones),
 			snapshot.Active,
 			snapshot.Configuration,
 		)
@@ -186,4 +187,24 @@ func (h *CommandHandler) handlePrintCommand(args map[string]string, outputFormat
 	default:
 		return "", fmt.Errorf("invalid print selection: %q", selection)
 	}
+}
+
+func zoneSnapshotToDTO(zones []controller.ZoneSnapshot) []dto.ZoneResult {
+	if len(zones) == 0 {
+		return nil
+	}
+
+	out := make([]dto.ZoneResult, 0, len(zones))
+	for _, zone := range zones {
+		out = append(out, dto.ZoneResult{
+			Name:                     zone.Name,
+			Sensors:                  append([]string(nil), zone.Sensors...),
+			Temperature:              zone.Temperature,
+			MovingAverageTemperature: zone.MovingAverageTemperature,
+			EffectiveTemperature:     zone.EffectiveTemperature,
+			ComputedSpeed:            zone.ComputedSpeed,
+		})
+	}
+
+	return out
 }

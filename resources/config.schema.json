@@ -62,6 +62,52 @@
                 "deaf"
             ]
         },
+        "speedCurvePoint": {
+            "type": "object",
+            "properties": {
+                "temp": {
+                    "type": "number",
+                    "multipleOf": 0.01,
+                    "minimum": 0,
+                    "maximum": 100,
+                    "description": "Temperature threshold (in degrees Celsius) up to two digit precision (e.g. 15.23)."
+                },
+                "speed": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100,
+                    "description": "Fan speed (in percent) to set when the temperature reaches this threshold."
+                }
+            },
+            "required": [
+                "temp",
+                "speed"
+            ],
+            "additionalProperties": false
+        },
+        "speedCurve": {
+            "type": "array",
+            "minItems": 1,
+            "description": "A list of temperature-speed pairs defining the fan response curve. Should be sorted by ascending `temp`.",
+            "items": {
+                "$ref": "#/$defs/speedCurvePoint"
+            },
+            "uniqueItems": true,
+            "examples": [
+                {
+                    "temp": 0,
+                    "speed": 0
+                },
+                {
+                    "temp": 65,
+                    "speed": 25
+                },
+                {
+                    "temp": 85,
+                    "speed": 100
+                }
+            ]
+        },
         "strategy": {
             "type": "object",
             "description": "A strategy defines how fan speed is adjusted based on temperature readings.",
@@ -79,52 +125,60 @@
                     "description": "The time window (in seconds) over which temperature readings are averaged."
                 },
                 "speedCurve": {
+                    "$ref": "#/$defs/speedCurve"
+                },
+                "sensorCurves": {
                     "type": "array",
                     "minItems": 1,
-                    "description": "A list of temperature-speed pairs defining the fan response curve. Should be sorted by ascending `temp`.",
+                    "description": "Named sensor zones with independent speed curves. When present, speedCurve is ignored.",
                     "items": {
                         "type": "object",
                         "properties": {
-                            "temp": {
-                                "type": "number",
-                                "multipleOf" : 0.01,
-                                "minimum": 0,
-                                "maximum": 100,
-                                "description": "Temperature threshold (in degrees Celsius) up to two digit precision (e.g. 15.23)."
+                            "name": {
+                                "type": "string",
+                                "pattern": "^[a-zA-Z0-9_-]+$",
+                                "description": "Unique name for this sensor zone."
                             },
-                            "speed": {
+                            "sensors": {
+                                "type": "array",
+                                "minItems": 1,
+                                "description": "Sensor names from ectool output (e.g. cpu@4c).",
+                                "items": {
+                                    "type": "string",
+                                    "minLength": 1
+                                },
+                                "uniqueItems": true
+                            },
+                            "movingAverageInterval": {
                                 "type": "integer",
-                                "minimum": 0,
+                                "minimum": 1,
                                 "maximum": 100,
-                                "description": "Fan speed (in percent) to set when the temperature reaches this threshold."
+                                "description": "Per-zone moving average override."
+                            },
+                            "speedCurve": {
+                                "$ref": "#/$defs/speedCurve"
                             }
                         },
                         "required": [
-                            "temp",
-                            "speed"
+                            "name",
+                            "sensors",
+                            "speedCurve"
                         ],
                         "additionalProperties": false
-                    },
-                    "uniqueItems": true,
-                    "minProperties": 1,
-                    "examples": [
-                        {
-                            "temp": 0,
-                            "speed": 0
-                        },
-                        {
-                            "temp": 65,
-                            "speed": 25
-                        },
-                        {
-                            "temp": 85,
-                            "speed": 100
-                        }
-                    ]
+                    }
                 }
             },
-            "required": [
-                "speedCurve"
+            "anyOf": [
+                {
+                    "required": [
+                        "speedCurve"
+                    ]
+                },
+                {
+                    "required": [
+                        "sensorCurves"
+                    ]
+                }
             ],
             "additionalProperties": false
         }

@@ -73,6 +73,36 @@
                 { "temp": 60, "speed": 100 }
             ]
         },
+        "fw16-dual-zone": {
+            "fanSpeedUpdateFrequency": 3,
+            "movingAverageInterval": 25,
+            "sensorCurves": [
+                {
+                    "name": "cpu-die",
+                    "sensors": ["apu_f75303@4d"],
+                    "movingAverageInterval": 15,
+                    "speedCurve": [
+                        { "temp": 0, "speed": 15 },
+                        { "temp": 55, "speed": 20 },
+                        { "temp": 65, "speed": 35 },
+                        { "temp": 75, "speed": 55 },
+                        { "temp": 85, "speed": 100 }
+                    ]
+                },
+                {
+                    "name": "motherboard-near-cpu",
+                    "sensors": ["cpu@4c"],
+                    "movingAverageInterval": 35,
+                    "speedCurve": [
+                        { "temp": 0, "speed": 15 },
+                        { "temp": 45, "speed": 20 },
+                        { "temp": 50, "speed": 35 },
+                        { "temp": 55, "speed": 60 },
+                        { "temp": 65, "speed": 100 }
+                    ]
+                }
+            ]
+        },
         "aeolus": {
             "fanSpeedUpdateFrequency": 2,
             "movingAverageInterval": 5,

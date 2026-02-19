@@ -71,7 +71,10 @@ Strategies must have unique names composed of upper/lower case letters, numbers,
 
 `[a-zA-Z0-9_-]+`
 
-And, at least have the `speedCurve` property defined.
+And, at least have one of these properties defined:
+
+- `speedCurve` (single-curve mode)
+- `sensorCurves` (multi-sensor mode)
 
 ### Speed Curve
 
@@ -92,6 +95,57 @@ It should contain at least a single temperature point.
 
 > `fw-fanctrl` measures the CPU temperature, calculates a moving average of it, and then finds an
 > appropriate `fan speed` value by interpolating on the curve.
+
+### Sensor Curves (Multi-Sensor)
+
+For laptops where multiple thermal zones matter (for example CPU and motherboard heat soaking),
+you can define `sensorCurves` instead of a single `speedCurve`.
+
+Each sensor curve defines:
+
+- a `name` (zone identifier)
+- a list of `sensors` (sensor names from `ectool temps all`)
+- a zone-specific `speedCurve`
+- an optional zone-specific `movingAverageInterval`
+
+When `sensorCurves` are defined, fan speed is computed for each zone independently, and the final
+fan speed is the maximum across all zones.
+
+```json
+"sensorCurves": [
+  {
+    "name": "cpu",
+    "sensors": ["cpu@4c"],
+    "movingAverageInterval": 20,
+    "speedCurve": [
+      { "temp": 0, "speed": 15 },
+      { "temp": 65, "speed": 25 },
+      { "temp": 85, "speed": 100 }
+    ]
+  },
+  {
+    "name": "chassis",
+    "sensors": ["ambient_f75303@4d", "charger_f75303@4d"],
+    "movingAverageInterval": 40,
+    "speedCurve": [
+      { "temp": 0, "speed": 15 },
+      { "temp": 45, "speed": 30 },
+      { "temp": 60, "speed": 80 }
+    ]
+  }
+]
+```
+
+To discover sensor names on your machine:
+
+```bash
+ectool temps all
+```
+
+Framework 16 note: common CPU-related sensors are:
+
+- `apu_f75303@4d` for the CPU internal temperature (die)
+- `cpu@4c` for the motherboard sensor near the CPU
 
 ### Fan Speed Update Frequency
 

@@ -6,6 +6,7 @@ import (
 	"math"
 	"os"
 	"os/signal"
+	"strconv"
 	"sync"
 	"syscall"
 	"time"
@@ -25,8 +26,27 @@ type StatusSnapshot struct {
 	Temperature              float64
 	MovingAverageTemperature float64
 	EffectiveTemperature     float64
+	Zones                    []ZoneSnapshot
 	Active                   bool
 	Configuration            map[string]any
+}
+
+type ZoneSnapshot struct {
+	Name                     string
+	Sensors                  []string
+	Temperature              float64
+	MovingAverageTemperature float64
+	EffectiveTemperature     float64
+	ComputedSpeed            int
+}
+
+type zoneState struct {
+	name        string
+	sensors     []string
+	curve       []config.SpeedCurvePoint
+	maInterval  int
+	history     []float64
+	historyHead int
 }
 
 type FanController struct {
@@ -38,6 +58,8 @@ type FanController struct {
 	tempHistoryHead     int
 	active              bool
 	timecount           int
+	zones               []zoneState
+	zoneStrategyKey     string
 	mu                  sync.Mutex
 }
 
@@ -66,6 +88,13 @@ func (f *FanController) GetActualTemperature() (float64, error) {
 	defer f.mu.Unlock()
 
 	return f.hardware.GetTemperature()
+}
+
+func (f *FanController) GetTemperatureReadings() ([]hardware.SensorReading, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	return f.hardware.GetTemperatures()
 }
 
 func (f *FanController) GetMovingAverageTemperature(timeInterval int) (float64, error) {
@@ -130,42 +159,29 @@ func (f *FanController) GetEffectiveTemperature(currentTemp float64, timeInterva
 	return round2(math.Min(movingAverageTemp, currentTemp)), nil
 }
 
-func (f *FanController) AdaptSpeed(currentTemp float64) error {
+func (f *FanController) AdaptSpeed(currentTemp float64, readings []hardware.SensorReading) error {
 	currentStrategy, err := f.GetCurrentStrategy()
 	if err != nil {
 		return err
 	}
 
-	if len(currentStrategy.SpeedCurve) == 0 {
-		return errors.New("current strategy has empty speed curve")
-	}
-
-	effectiveTemp, err := f.GetEffectiveTemperature(currentTemp, currentStrategy.MovingAverageInterval)
-	if err != nil {
-		return err
-	}
-
-	minPoint := currentStrategy.SpeedCurve[0]
-	maxPoint := currentStrategy.SpeedCurve[len(currentStrategy.SpeedCurve)-1]
-
-	for _, point := range currentStrategy.SpeedCurve {
-		if effectiveTemp > point.Temp {
-			minPoint = point
-			continue
+	newSpeed := 0
+	if currentStrategy.IsMultiSensor() {
+		newSpeed, err = f.adaptSpeedForSensorCurves(currentStrategy, readings)
+		if err != nil {
+			return err
+		}
+	} else {
+		if len(currentStrategy.SpeedCurve) == 0 {
+			return errors.New("current strategy has empty speed curve")
 		}
 
-		maxPoint = point
-		break
-	}
+		effectiveTemp, err := f.GetEffectiveTemperature(currentTemp, currentStrategy.MovingAverageInterval)
+		if err != nil {
+			return err
+		}
 
-	newSpeed := 0
-	if minPoint.Temp == maxPoint.Temp && minPoint.Speed == maxPoint.Speed {
-		newSpeed = minPoint.Speed
-	} else if maxPoint.Temp == minPoint.Temp {
-		newSpeed = maxPoint.Speed
-	} else {
-		slope := float64(maxPoint.Speed-minPoint.Speed) / (maxPoint.Temp - minPoint.Temp)
-		newSpeed = int(float64(minPoint.Speed) + (effectiveTemp-minPoint.Temp)*slope)
+		newSpeed = interpolateSpeed(effectiveTemp, currentStrategy.SpeedCurve)
 	}
 
 	f.mu.Lock()
@@ -177,6 +193,168 @@ func (f *FanController) AdaptSpeed(currentTemp float64) error {
 	}
 
 	return nil
+}
+
+func (f *FanController) adaptSpeedForSensorCurves(strategy config.Strategy, readings []hardware.SensorReading) (int, error) {
+	f.ensureZoneState(strategy)
+
+	f.mu.Lock()
+	zones := make([]zoneState, len(f.zones))
+	copy(zones, f.zones)
+	f.mu.Unlock()
+
+	if len(zones) == 0 {
+		return 0, errors.New("current strategy has empty sensor curves")
+	}
+
+	readingByName := make(map[string]hardware.SensorReading, len(readings))
+	readingByIndex := make(map[int]hardware.SensorReading, len(readings))
+	for _, reading := range readings {
+		readingByName[reading.Name] = reading
+		readingByIndex[reading.Index] = reading
+	}
+
+	maxSpeed := 0
+	for i := range zones {
+		zoneTemp := 50.0
+		found := false
+
+		for _, sensorRef := range zones[i].sensors {
+			if reading, ok := readingByName[sensorRef]; ok {
+				if !found || reading.TempC > zoneTemp {
+					zoneTemp = reading.TempC
+					found = true
+				}
+				continue
+			}
+
+			idx, err := strconv.Atoi(sensorRef)
+			if err != nil {
+				continue
+			}
+			if reading, ok := readingByIndex[idx]; ok {
+				if !found || reading.TempC > zoneTemp {
+					zoneTemp = reading.TempC
+					found = true
+				}
+			}
+		}
+
+		effectiveTemp := f.pushZoneTemperatureAndGetEffectiveTemp(i, zoneTemp, zones[i].maInterval)
+		speed := interpolateSpeed(effectiveTemp, zones[i].curve)
+		if speed > maxSpeed {
+			maxSpeed = speed
+		}
+	}
+
+	return maxSpeed, nil
+}
+
+func interpolateSpeed(effectiveTemp float64, curve []config.SpeedCurvePoint) int {
+	minPoint := curve[0]
+	maxPoint := curve[len(curve)-1]
+
+	for _, point := range curve {
+		if effectiveTemp > point.Temp {
+			minPoint = point
+			continue
+		}
+
+		maxPoint = point
+		break
+	}
+
+	if minPoint.Temp == maxPoint.Temp && minPoint.Speed == maxPoint.Speed {
+		return minPoint.Speed
+	}
+	if maxPoint.Temp == minPoint.Temp {
+		return maxPoint.Speed
+	}
+
+	slope := float64(maxPoint.Speed-minPoint.Speed) / (maxPoint.Temp - minPoint.Temp)
+	return int(float64(minPoint.Speed) + (effectiveTemp-minPoint.Temp)*slope)
+}
+
+func (f *FanController) ensureZoneState(strategy config.Strategy) {
+	strategyKey := strategy.Name
+	if !strategy.IsMultiSensor() {
+		f.mu.Lock()
+		f.zones = nil
+		f.zoneStrategyKey = strategyKey
+		f.mu.Unlock()
+		return
+	}
+
+	f.mu.Lock()
+	if f.zoneStrategyKey == strategyKey && len(f.zones) == len(strategy.SensorCurves) {
+		f.mu.Unlock()
+		return
+	}
+
+	zones := make([]zoneState, 0, len(strategy.SensorCurves))
+	for _, sensorCurve := range strategy.SensorCurves {
+		zones = append(zones, zoneState{
+			name:        sensorCurve.Name,
+			sensors:     append([]string(nil), sensorCurve.Sensors...),
+			curve:       append([]config.SpeedCurvePoint(nil), sensorCurve.SpeedCurve...),
+			maInterval:  sensorCurve.MovingAverageInterval,
+			history:     make([]float64, tempHistoryLimit),
+			historyHead: 0,
+		})
+	}
+
+	f.zones = zones
+	f.zoneStrategyKey = strategyKey
+	f.mu.Unlock()
+}
+
+func (f *FanController) pushZoneTemperatureAndGetEffectiveTemp(zoneIndex int, currentTemp float64, timeInterval int) float64 {
+	f.mu.Lock()
+	if zoneIndex < 0 || zoneIndex >= len(f.zones) {
+		f.mu.Unlock()
+		return currentTemp
+	}
+
+	zone := &f.zones[zoneIndex]
+	if len(zone.history) == 0 {
+		zone.history = make([]float64, tempHistoryLimit)
+		zone.historyHead = 0
+	}
+
+	zone.history[zone.historyHead] = currentTemp
+	zone.historyHead = (zone.historyHead + 1) % len(zone.history)
+
+	historyLen := len(zone.history)
+	targetNonZero := historyLen
+	if timeInterval > 0 {
+		targetNonZero = timeInterval
+	}
+
+	total := 0.0
+	nonZeroCount := 0
+	for i := 0; i < historyLen; i++ {
+		idx := zone.historyHead - 1 - i
+		if idx < 0 {
+			idx += historyLen
+		}
+
+		temp := zone.history[idx]
+		if temp > 0 {
+			total += temp
+			nonZeroCount++
+			if nonZeroCount == targetNonZero {
+				break
+			}
+		}
+	}
+	f.mu.Unlock()
+
+	if nonZeroCount == 0 {
+		return round2(currentTemp)
+	}
+
+	movingAverage := round2(total / float64(nonZeroCount))
+	return round2(math.Min(movingAverage, currentTemp))
 }
 
 func (f *FanController) SetSpeed(speed int) error {
@@ -199,6 +377,8 @@ func (f *FanController) OverwriteStrategy(name string) error {
 
 	f.overwrittenStrategy = &strategy
 	f.timecount = 0
+	f.zoneStrategyKey = ""
+	f.zones = nil
 
 	return nil
 }
@@ -209,6 +389,8 @@ func (f *FanController) ClearOverwrittenStrategy() {
 
 	f.overwrittenStrategy = nil
 	f.timecount = 0
+	f.zoneStrategyKey = ""
+	f.zones = nil
 }
 
 func (f *FanController) GetCurrentStrategy() (config.Strategy, error) {
@@ -291,10 +473,12 @@ func (f *FanController) Run(debug bool) error {
 			continue
 		}
 
-		temp, err := f.GetActualTemperature()
+		readings, err := f.GetTemperatureReadings()
 		if err != nil {
 			return fmt.Errorf("critical error, exiting for safety reasons: %w", err)
 		}
+
+		temp := highestFromReadings(readings)
 
 		currentStrategy, err := f.GetCurrentStrategy()
 		if err != nil {
@@ -318,7 +502,7 @@ func (f *FanController) Run(debug bool) error {
 		f.mu.Unlock()
 
 		if shouldAdapt {
-			if err := f.AdaptSpeed(temp); err != nil {
+			if err := f.AdaptSpeed(temp, readings); err != nil {
 				var invalidStrategyErr config.InvalidStrategyError
 				if errors.As(err, &invalidStrategyErr) {
 					return fmt.Errorf("missing strategy, exiting for safety reasons: %w", err)
@@ -374,6 +558,8 @@ func (f *FanController) ReloadConfiguration() error {
 	if err == nil && f.overwrittenStrategy != nil {
 		overwritten = f.overwrittenStrategy.Name
 	}
+	f.zoneStrategyKey = ""
+	f.zones = nil
 	f.mu.Unlock()
 
 	if err != nil {
@@ -403,6 +589,8 @@ func (f *FanController) SetConfiguration(raw []byte) error {
 	}
 
 	err = f.config.Save()
+	f.zoneStrategyKey = ""
+	f.zones = nil
 	f.mu.Unlock()
 	if err != nil {
 		return err
@@ -438,10 +626,11 @@ func (f *FanController) StatusSnapshot() (StatusSnapshot, error) {
 		return StatusSnapshot{}, err
 	}
 
-	currentTemp, err := f.GetActualTemperature()
+	readings, err := f.GetTemperatureReadings()
 	if err != nil {
 		return StatusSnapshot{}, err
 	}
+	currentTemp := highestFromReadings(readings)
 
 	movingAverageTemp, err := f.GetMovingAverageTemperature(currentStrategy.MovingAverageInterval)
 	if err != nil {
@@ -453,6 +642,87 @@ func (f *FanController) StatusSnapshot() (StatusSnapshot, error) {
 		return StatusSnapshot{}, err
 	}
 
+	zones := []ZoneSnapshot{}
+	if currentStrategy.IsMultiSensor() {
+		f.ensureZoneState(currentStrategy)
+
+		readingByName := make(map[string]hardware.SensorReading, len(readings))
+		readingByIndex := make(map[int]hardware.SensorReading, len(readings))
+		for _, reading := range readings {
+			readingByName[reading.Name] = reading
+			readingByIndex[reading.Index] = reading
+		}
+
+		f.mu.Lock()
+		zonesState := make([]zoneState, len(f.zones))
+		copy(zonesState, f.zones)
+		f.mu.Unlock()
+
+		zones = make([]ZoneSnapshot, 0, len(zonesState))
+		for _, zone := range zonesState {
+			zoneTemp := 50.0
+			found := false
+			for _, sensorRef := range zone.sensors {
+				if reading, ok := readingByName[sensorRef]; ok {
+					if !found || reading.TempC > zoneTemp {
+						zoneTemp = reading.TempC
+						found = true
+					}
+					continue
+				}
+
+				idx, parseErr := strconv.Atoi(sensorRef)
+				if parseErr != nil {
+					continue
+				}
+				if reading, ok := readingByIndex[idx]; ok {
+					if !found || reading.TempC > zoneTemp {
+						zoneTemp = reading.TempC
+						found = true
+					}
+				}
+			}
+
+			movingAverage := zoneTemp
+			if len(zone.history) > 0 {
+				total := 0.0
+				nonZero := 0
+				target := len(zone.history)
+				if zone.maInterval > 0 {
+					target = zone.maInterval
+				}
+				for i := 0; i < len(zone.history); i++ {
+					idx := zone.historyHead - 1 - i
+					if idx < 0 {
+						idx += len(zone.history)
+					}
+					temp := zone.history[idx]
+					if temp > 0 {
+						total += temp
+						nonZero++
+						if nonZero == target {
+							break
+						}
+					}
+				}
+				if nonZero > 0 {
+					movingAverage = round2(total / float64(nonZero))
+				}
+			}
+
+			effective := round2(math.Min(movingAverage, zoneTemp))
+			zoneSpeed := interpolateSpeed(effective, zone.curve)
+			zones = append(zones, ZoneSnapshot{
+				Name:                     zone.name,
+				Sensors:                  append([]string(nil), zone.sensors...),
+				Temperature:              round2(zoneTemp),
+				MovingAverageTemperature: round2(movingAverage),
+				EffectiveTemperature:     effective,
+				ComputedSpeed:            zoneSpeed,
+			})
+		}
+	}
+
 	f.mu.Lock()
 	snapshot := StatusSnapshot{
 		Strategy:                 currentStrategy.Name,
@@ -461,6 +731,7 @@ func (f *FanController) StatusSnapshot() (StatusSnapshot, error) {
 		Temperature:              currentTemp,
 		MovingAverageTemperature: movingAverageTemp,
 		EffectiveTemperature:     effectiveTemp,
+		Zones:                    zones,
 		Active:                   f.active,
 		Configuration: map[string]any{
 			"path": f.config.Path,
@@ -543,4 +814,19 @@ func stopAndDrainTimer(timer *time.Timer) {
 
 func round2(value float64) float64 {
 	return math.Round(value*100) / 100
+}
+
+func highestFromReadings(readings []hardware.SensorReading) float64 {
+	if len(readings) == 0 {
+		return 50.0
+	}
+
+	maxTemp := readings[0].TempC
+	for _, reading := range readings[1:] {
+		if reading.TempC > maxTemp {
+			maxTemp = reading.TempC
+		}
+	}
+
+	return round2(maxTemp)
 }

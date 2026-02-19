@@ -22,7 +22,9 @@ const (
 var (
 	batterySensorRegexp = regexp.MustCompile(`\d+ Battery`)
 	sensorIDRegexp      = regexp.MustCompile(`(?m)^\d+`)
-	temperatureRegexp   = regexp.MustCompile(`\(= (\d+) C\)`)
+	temperatureRegexp   = regexp.MustCompile(`\(=\s*(\d+)\s*C\)`)
+	namedTempRegexp     = regexp.MustCompile(`^\s*(\S+)\s+\d+\s+K\s+\(=\s*(\d+)\s*C\)`)
+	numericTempRegexp   = regexp.MustCompile(`^\s*(\d+):\s+\d+\s+K\s+\(=\s*(\d+)\s*C\)`)
 	acPresentRegexp     = regexp.MustCompile(`Flags.*(AC_PRESENT)`)
 )
 
@@ -56,25 +58,52 @@ func (c *EctoolHardwareController) populateNonBatterySensors() error {
 }
 
 func (c *EctoolHardwareController) GetTemperature() (float64, error) {
-	var output strings.Builder
+	readings, err := c.GetTemperatures()
+	if err != nil {
+		return 0, err
+	}
 
+	if len(readings) == 0 {
+		return 50.0, nil
+	}
+
+	maxTemp := readings[0].TempC
+	for _, reading := range readings[1:] {
+		if reading.TempC > maxTemp {
+			maxTemp = reading.TempC
+		}
+	}
+
+	return math.Round(maxTemp*100) / 100, nil
+}
+
+func (c *EctoolHardwareController) GetTemperatures() ([]SensorReading, error) {
 	if c.noBatterySensorMode {
+		readings := make([]SensorReading, 0, len(c.nonBatterySensors))
+
 		for _, sensorID := range c.nonBatterySensors {
 			sensorOutput, err := runEctoolCommand(false, "temps", sensorID)
 			if err != nil {
-				return 0, err
+				return nil, err
 			}
-			output.WriteString(sensorOutput)
+
+			parsed := parseSensorReadings(sensorOutput)
+			if len(parsed) == 0 {
+				continue
+			}
+
+			readings = append(readings, parsed...)
 		}
-	} else {
-		rawOutput, err := runEctoolCommand(false, "temps", "all")
-		if err != nil {
-			return 0, err
-		}
-		output.WriteString(rawOutput)
+
+		return readings, nil
 	}
 
-	return highestTemperatureOrFallback(output.String()), nil
+	rawOutput, err := runEctoolCommand(false, "temps", "all")
+	if err != nil {
+		return nil, err
+	}
+
+	return parseSensorReadings(rawOutput), nil
 }
 
 func (c *EctoolHardwareController) SetSpeed(speed int) error {
@@ -125,13 +154,72 @@ func parseTemperatures(output string) []int {
 	return temps
 }
 
+func parseSensorReadings(output string) []SensorReading {
+	lines := strings.Split(output, "\n")
+	readings := make([]SensorReading, 0, len(lines))
+	sensorPos := 0
+
+	for idx, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		if matches := numericTempRegexp.FindStringSubmatch(line); len(matches) == 3 {
+			temp, err := strconv.Atoi(matches[2])
+			if err != nil || temp <= 0 {
+				continue
+			}
+
+			name := matches[1]
+			parsedIndex, err := strconv.Atoi(matches[1])
+			if err != nil {
+				parsedIndex = idx
+			}
+
+			readings = append(readings, SensorReading{
+				Name:    name,
+				Index:   parsedIndex,
+				TempC:   math.Round(float64(temp)*100) / 100,
+				Present: true,
+			})
+			sensorPos++
+			continue
+		}
+
+		if matches := namedTempRegexp.FindStringSubmatch(line); len(matches) == 3 {
+			temp, err := strconv.Atoi(matches[2])
+			if err != nil || temp <= 0 {
+				continue
+			}
+
+			readings = append(readings, SensorReading{
+				Name:    matches[1],
+				Index:   sensorPos,
+				TempC:   math.Round(float64(temp)*100) / 100,
+				Present: true,
+			})
+			sensorPos++
+		}
+	}
+
+	return readings
+}
+
 func highestTemperatureOrFallback(output string) float64 {
 	temps := parseTemperatures(output)
 	if len(temps) == 0 {
 		return 50.0
 	}
 
-	return math.Round(float64(temps[0])*100) / 100
+	maxTemp := temps[0]
+	for _, temp := range temps[1:] {
+		if temp > maxTemp {
+			maxTemp = temp
+		}
+	}
+
+	return math.Round(float64(maxTemp)*100) / 100
 }
 
 func parseACPresent(output string) bool {

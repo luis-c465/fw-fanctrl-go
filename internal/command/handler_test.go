@@ -10,6 +10,7 @@ import (
 	"github.com/luis-c465/fw-fanctrl/internal/config"
 	"github.com/luis-c465/fw-fanctrl/internal/controller"
 	"github.com/luis-c465/fw-fanctrl/internal/dto"
+	"github.com/luis-c465/fw-fanctrl/internal/hardware"
 	"github.com/luis-c465/fw-fanctrl/resources"
 )
 
@@ -26,6 +27,13 @@ func (m *mockHardwareController) GetTemperature() (float64, error) {
 	defer m.mu.Unlock()
 
 	return m.temperature, nil
+}
+
+func (m *mockHardwareController) GetTemperatures() ([]hardware.SensorReading, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	return []hardware.SensorReading{{Name: "cpu@4c", Index: 0, TempC: m.temperature, Present: true}}, nil
 }
 
 func (m *mockHardwareController) SetSpeed(speed int) error {

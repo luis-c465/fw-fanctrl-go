@@ -17,8 +17,8 @@ func TestParseEmbeddedDefaultConfig(t *testing.T) {
 		t.Fatalf("Parse() returned error: %v", err)
 	}
 
-	if len(parsed.Strategies) != 7 {
-		t.Fatalf("expected 7 strategies, got %d", len(parsed.Strategies))
+	if len(parsed.Strategies) != 8 {
+		t.Fatalf("expected 8 strategies, got %d", len(parsed.Strategies))
 	}
 
 	expected := map[string]StrategyParams{
@@ -131,11 +131,11 @@ func TestGetStrategiesReturnsSortedNames(t *testing.T) {
 	cfg.Data = parsed
 
 	strategies := cfg.GetStrategies()
-	if len(strategies) != 7 {
-		t.Fatalf("expected 7 strategies, got %d", len(strategies))
+	if len(strategies) != 8 {
+		t.Fatalf("expected 8 strategies, got %d", len(strategies))
 	}
 
-	expectedOrder := []string{"aeolus", "agile", "deaf", "laziest", "lazy", "medium", "very-agile"}
+	expectedOrder := []string{"aeolus", "agile", "deaf", "fw16-dual-zone", "laziest", "lazy", "medium", "very-agile"}
 	for i, name := range expectedOrder {
 		if strategies[i] != name {
 			t.Fatalf("unexpected strategy order at index %d: got %q, want %q", i, strategies[i], name)
@@ -252,8 +252,8 @@ func TestReloadCreatesDefaultFileWhenMissing(t *testing.T) {
 		t.Fatalf("expected config file to exist at %q: %v", configPath, err)
 	}
 
-	if len(cfg.Data.Strategies) != 7 {
-		t.Fatalf("expected 7 strategies after reload, got %d", len(cfg.Data.Strategies))
+	if len(cfg.Data.Strategies) != 8 {
+		t.Fatalf("expected 8 strategies after reload, got %d", len(cfg.Data.Strategies))
 	}
 }
 
@@ -295,5 +295,63 @@ func TestSaveWritesParsableJSON(t *testing.T) {
 
 	if reloaded.Data.DefaultStrategy != "medium" {
 		t.Fatalf("expected reloaded defaultStrategy to be 'medium', got %q", reloaded.Data.DefaultStrategy)
+	}
+}
+
+func TestParseMultiSensorStrategy(t *testing.T) {
+	cfg := &Configuration{}
+	raw := []byte(`{
+		"$schema": "./config.schema.json",
+		"defaultStrategy": "multi",
+		"strategyOnDischarging": "",
+		"strategies": {
+			"multi": {
+				"fanSpeedUpdateFrequency": 5,
+				"movingAverageInterval": 30,
+				"sensorCurves": [
+					{
+						"name": "cpu",
+						"sensors": ["cpu@4c"],
+						"speedCurve": [{"temp": 0, "speed": 15}, {"temp": 85, "speed": 100}]
+					}
+				]
+			}
+		}
+	}`)
+
+	parsed, err := cfg.Parse(raw)
+	if err != nil {
+		t.Fatalf("Parse() returned error: %v", err)
+	}
+
+	strategy := NewStrategy("multi", parsed.Strategies["multi"])
+	if !strategy.IsMultiSensor() {
+		t.Fatal("expected parsed strategy to be multi-sensor")
+	}
+}
+
+func TestParseRejectsEmptySensorCurveName(t *testing.T) {
+	cfg := &Configuration{}
+	raw := []byte(`{
+		"$schema": "./config.schema.json",
+		"defaultStrategy": "multi",
+		"strategyOnDischarging": "",
+		"strategies": {
+			"multi": {
+				"movingAverageInterval": 30,
+				"sensorCurves": [
+					{
+						"name": "",
+						"sensors": ["cpu@4c"],
+						"speedCurve": [{"temp": 0, "speed": 15}]
+					}
+				]
+			}
+		}
+	}`)
+
+	_, err := cfg.Parse(raw)
+	if err == nil {
+		t.Fatal("expected validation error, got nil")
 	}
 }
